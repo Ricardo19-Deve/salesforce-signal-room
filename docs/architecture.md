@@ -23,6 +23,8 @@
 | `WR_Run__c` | Engine run log: accounts processed, pointers new / updated / expired, errors. |
 | `WR_Pointer__c` | The opportunity: type, category, value, score, priority, rationale, evidence JSON, playbook, AI insight, decision, linked Opportunity, signature. |
 | `WR_Session__c`, `WR_Commitment__c` | Weekly win rooms and the actions committed in them. |
+| `WR_Contract__c`, `WR_Contract_Line__c` | Volume commitments: term and tolerance, committed units per month and contracted price per product line. |
+| `WR_Market_Site__c` | Hospital from a public procedure registry (UK: NJR) with 12-month hip / knee volumes, trend, monthly series and the linked account. |
 
 All objects use Read/Write sharing; access is granted by the two permission sets. The admin set adds View All / Modify All and the `Win_Room_Admin` custom permission, which the controller checks for rules, engine runs and demo data.
 
@@ -41,7 +43,11 @@ WinRoomEngineBatch (in-scope accounts, 5 per execute)
 
 **Priority score** (0–100) = 60% value at stake (log scale, €1M = 100) + 25% rule weight (1–5) + 15% urgency (tender deadline, hard churn, new surgeon). High ≥ 65, Medium ≥ 45.
 
-**Signature** = rule code | account | product line | surgeon | tender. It identifies a pointer across runs, so the engine can run daily or after every data load.
+**Contracts.** `WinRoomContracts.evaluate()` compares committed and delivered units per month and line, and returns variance, cumulative variance, the 6-month run-rate, the projection at term end and a status. The portal and the `CONTRACT_*` rules use the same calculation. Contract pointers are kept apart from the one-pointer-per-product dedupe: a shortfall against a commitment is a different conversation from churn.
+
+**Market volumes.** The registry CSV is parsed in the browser (`winRoomMarket`), so large files never reach Apex; `WinRoomMarket` upserts the aggregates, matches hospitals to accounts with a token index and copies the volumes of linked hospitals into the account profiles.
+
+**Signature** = rule code | account | product line | surgeon | tender (| contract for contract pointers). It identifies a pointer across runs, so the engine can run daily or after every data load.
 
 ## Security
 

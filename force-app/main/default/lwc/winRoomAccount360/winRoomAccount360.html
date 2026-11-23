@@ -60,6 +60,37 @@
                     </div>
                 </div>
 
+                <template lwc:if={hasMarket}>
+                    <div class="wr-card">
+                        <div class="wr-card-title">Market volume <span class="wr-card-sub">hip and knee procedures per month, national joint registry, as at {marketAsOf}</span></div>
+                        <div class="market-sites">
+                            <template for:each={marketSites} for:item="s">
+                                <span key={s.key} class="wr-tag">{s.name} · {s.hip} hips · {s.knee} knees / yr</span>
+                            </template>
+                        </div>
+                        <c-win-room-line-chart months={market.months} series={market.series} unit="units" wide heading="Registry procedures per month"></c-win-room-line-chart>
+                    </div>
+                </template>
+
+                <div class="wr-card">
+                    <div class="wr-card-title">Contracts <span class="wr-card-sub">committed vs delivered to date</span></div>
+                    <template lwc:if={hasContracts}>
+                        <table class="wr-table">
+                            <tbody>
+                                <template for:each={contracts} for:item="c">
+                                    <tr key={c.contractId}>
+                                        <td><div class="wr-strong">{c.name}</div><div class="wr-faint">{c.term}</div></td>
+                                        <td><span class={c.healthClass}>{c.health}</span></td>
+                                        <td class="wr-num wr-strong">{c.complianceText}</td>
+                                        <td class="wr-muted">{c.lineText}</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                    <template lwc:else><div class="wr-faint">No volume contracts for this account.</div></template>
+                </div>
+
                 <div class="wr-card">
                     <div class="wr-card-title">Revenue trend by category <span class="wr-card-sub">monthly</span></div>
                     <c-win-room-line-chart months={data.months} series={data.series} unit="money" wide heading="Monthly revenue by category"></c-win-room-line-chart>

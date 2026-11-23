@@ -105,7 +105,15 @@ public with sharing class WinRoomRules {
             rule('NT_SHARE_OF_WALLET', 'Low share of wallet / greenfield', 'SHARE_OF_WALLET', CAT_NEW, 3,
                 15, 25000, 12, null, null, null, 0.30,
                 'Contoso revenue covers less than 15% of the estimated reconstructive market of the account (procedures x basket price).',
-                'Run stakeholder mapping (surgeons, procurement, value committee). Build the clinical and economic case and target the next tender or framework renewal.')
+                'Run stakeholder mapping (surgeons, procurement, value committee). Build the clinical and economic case and target the next tender or framework renewal.'),
+            rule('CT_COMPLIANCE', 'Contract compliance - volume vs commitment', 'CONTRACT_COMPLIANCE', CAT_WINBACK, 5,
+                10, 5000, null, 6, null, null, null,
+                'Delivered volume of a contract line deviates from the monthly commitment by more than 10%, to date and over the last 6 months. Shortfall = win back; overrun = renegotiate.',
+                'Share the delivery report with the account. Shortfall: find the cause (stock, competitor substitution, surgeon change, case mix) and agree a recovery plan or the contractual remedy. Overrun: lock the extra volume into an amended tier.'),
+            rule('CT_RENEWAL', 'Contract renewal - commitment ends soon', 'CONTRACT_RENEWAL', CAT_NEW, 4,
+                null, 0, 6, null, null, null, null,
+                'An active contract ends within 6 months. Renewals start early so the volume is not lost to a tender.',
+                'Start the renewal 6 months before the end. Prepare the compliance summary and the value delivered (outcomes, service, education), then propose the next term and volume tier.')
         };
     }
 

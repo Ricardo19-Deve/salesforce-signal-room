@@ -54,6 +54,16 @@
                 <default>false</default>
                 <label>SHARE_OF_WALLET</label>
             </value>
+            <value>
+                <fullName>CONTRACT_COMPLIANCE</fullName>
+                <default>false</default>
+                <label>CONTRACT_COMPLIANCE</label>
+            </value>
+            <value>
+                <fullName>CONTRACT_RENEWAL</fullName>
+                <default>false</default>
+                <label>CONTRACT_RENEWAL</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

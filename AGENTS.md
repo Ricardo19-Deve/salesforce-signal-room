@@ -20,7 +20,9 @@
 7. **Neutral UI.** Use `c-win-room-select`, `c-win-room-segmented`, `.wr-btn`, `.wr-input`, `.wr-switch` and the `--wr-*` tokens from `winRoomStyles`. Do not use themed base components (`lightning-button`, `lightning-combobox`, `lightning-input`) or global SLDS utility classes: they pick up the org's brand colour and are not available on LWR sites.
 8. **Charts.** Four series at most, colours in the fixed `SERIES_COLORS` order, always with a legend and the table view.
 9. **Developer Edition storage.** Keep the compact demo mode (18 months, one row per line and month) working; a Developer Edition org has 5 MB of data.
-10. **Tests.** `WinRoomTest` runs as a user with `Win_Room_Admin`. Extend it for new rule types (plant the pattern in `WinRoomMockData.pattern` and assert the pointer type).
+10. **Real data stays out of the repository.** Demo data is generated and fictitious. The only real data the module uses is the public registry export, which users download themselves; never commit registry files, customer names, contracts or prices from a real organisation.
+11. **Contracts and registry.** Change compliance logic only in `WinRoomContracts` (portal and rules share it). Registry imports must never overwrite account links (`Account__c`, `Match_Status__c`) and must exclude the current, incomplete month.
+12. **Tests.** `WinRoomTest` runs as a user with `Win_Room_Admin`. Extend it for new rule types (plant the pattern in `WinRoomMockData.pattern` and assert the pointer type).
 
 ## Commands
 

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Volume_Source__c</fullName>
+    <description>Where the procedure volumes come from: an estimate or the National Joint Registry (UK).</description>
+    <label>Volume Source</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Estimate</fullName>
+                <default>true</default>
+                <label>Estimate</label>
+            </value>
+            <value>
+                <fullName>NJR</fullName>
+                <default>false</default>
+                <label>NJR</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

@@ -29,6 +29,8 @@ Rules are `WR_Rule__c` records, edited in **Rules & Data → Rules**. **Reset to
 | `NEW_SURGEON` | Affiliation started in the last *Recent* months, no sales yet. | Procedures × *Threshold* × basket |
 | `TENDER_RADAR` | Open tender with a deadline within *Lookback* months; due date = deadline − 14 days. | Estimated value × *Threshold* (win probability) |
 | `SHARE_OF_WALLET` | Revenue / estimated market (procedures × basket) below *Threshold*. | *Expected ratio* × market − revenue |
+| `CONTRACT_COMPLIANCE` | A contract line is *Under* (or *Over*) its commitment to date beyond the contract tolerance **and** the last *Recent* months run beyond *Threshold*. Under = **contract shortfall** (win back), over = **contract overrun** (renegotiate). | Annual gap at the current run-rate (shortfall: or the backlog, whichever is larger) |
+| `CONTRACT_RENEWAL` | Active contract ending within *Lookback* months; due date = end − 90 days. | Annual contract value |
 
 ## Default rules
 
@@ -47,10 +49,20 @@ Rules are `WR_Rule__c` records, edited in **Rules & Data → Rules**. **Reset to
 | `SX_NEW_SURGEON` | New surgeon - first case target | NEW_SURGEON | joined in the last 6 months, 40% of cases |
 | `NT_TENDER` | Tender radar | TENDER_RADAR | deadline within 2 months, 35% win probability |
 | `NT_SHARE_OF_WALLET` | Low share of wallet / greenfield | SHARE_OF_WALLET | below 15%, target 30% |
+| `CT_COMPLIANCE` | Contract compliance - volume vs commitment | CONTRACT_COMPLIANCE | 10%, 6-month run-rate, €5k |
+| `CT_RENEWAL` | Contract renewal - commitment ends soon | CONTRACT_RENEWAL | ends within 6 months |
 
 ## Product lines
 
 `WR_Product_Line__c` maps materials to a system and component. The codes are referenced by the rules and by the demo generator: `KNEE_FEM`, `KNEE_TIB`, `KNEE_PAT`, `KNEE_CL`, `BONE_CEMENT`, `PARTIAL_KNEE`, `HIP_CUP`, `HIP_LINER`, `HIP_STEM_T`, `HIP_STEM_C`, `HIP_HEAD`, `ROBOT_KNEE`, `ROBOT_HIP`. The demo product names (Meridian, Unity, Orbit, Summit, Vista, Atlas) are fictitious. Capital lines (robots) are skipped by the churn and peer rules.
+
+## Contracts
+
+`WR_Contract__c` (account, start / end, status, tolerance %, default 10%) with `WR_Contract_Line__c` (product line, committed units per month, contracted unit price). Create and edit them in the **Contracts** view (admins). The comparison starts at the later of the contract start and the first month with sales data, so a contract older than the loaded history is not reported as under-delivered.
+
+## Market volumes (public registry)
+
+`WR_Market_Site__c` holds one record per registry hospital: provider type, trust / company, region, hips and knees for the last 12 and prior 12 complete months, the monthly series and the linked account. The UK source is the public CSV export of the National Joint Registry (NJR StatsOnline, © NJR). Import it in **Market → Import NJR CSV**; the browser parses the file and only aggregates are stored. Matching links a hospital to an account when the hospital or trust name matches exactly (after removing words such as *hospital*, *NHS*, *trust*), and suggests a link when a distinctive word is shared. Linked accounts get `Volume_Source__c = NJR` and the registry volumes in their profile.
 
 ## Loading real data
 
