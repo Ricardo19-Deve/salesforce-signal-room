@@ -13,7 +13,7 @@
 .topbar {
     display: flex;
     align-items: center;
-    gap: 2rem;
+    gap: 1.5rem;
     background: var(--wr-navy);
     color: #fff;
     padding: 0 1.5rem;
@@ -47,7 +47,7 @@
     border: 0;
     border-bottom: 2px solid transparent;
     color: rgba(255, 255, 255, 0.72);
-    padding: 0 0.85rem;
+    padding: 0 0.75rem;
     cursor: pointer;
     font: inherit;
     font-size: 0.84rem;
@@ -57,6 +57,25 @@
 .nav-item:hover { color: #fff; }
 .nav-item_active { color: #fff; font-weight: 600; border-bottom-color: #fff; }
 .nav-icon { opacity: 0.85; }
+.guide-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 0.8rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+.guide-btn:hover, .guide-btn_active { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.guide-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35); }
+.sep { margin: 0 0.45rem; color: var(--wr-muted); }
+.page-guide { font-size: 0.8125rem; }
 .avatar {
     width: 32px;
     height: 32px;

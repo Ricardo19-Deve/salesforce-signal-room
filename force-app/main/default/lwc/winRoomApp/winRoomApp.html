@@ -16,6 +16,10 @@
                     </button>
                 </template>
             </nav>
+            <button type="button" class={guideBtnClass} onclick={openGuide} title="How the Win Room works">
+                <lightning-icon icon-name="utility:help" size="x-small" variant="inverse"></lightning-icon>
+                <span>Guide</span>
+            </button>
             <div class="me" title={userName}>
                 <span class="avatar">{userInitials}</span>
             </div>
@@ -24,7 +28,7 @@
         <div class="pagebar">
             <div class="page-title">
                 <h1>{current.label}</h1>
-                <p>{current.subtitle}</p>
+                <p>{current.subtitle}<template lwc:if={showPageGuide}><span class="sep">·</span><span class="wr-link page-guide" onclick={openPageGuide}>How this page works</span></template></p>
             </div>
             <div class="page-tools">
                 <template lwc:if={showFilters}>
@@ -71,6 +75,12 @@
             </template>
             <template lwc:if={isMarket}>
                 <c-win-room-market is-admin={isAdmin} ondatachanged={handleDataChanged}></c-win-room-market>
+            </template>
+            <template lwc:if={isTenders}>
+                <c-win-room-tenders is-admin={isAdmin} ondatachanged={handleDataChanged} onopenaccount={handleOpenAccount}></c-win-room-tenders>
+            </template>
+            <template lwc:if={isGuide}>
+                <c-win-room-guide section={guideSection} onnavigate={handleGuideNavigate}></c-win-room-guide>
             </template>
             <template lwc:if={isAdminView}>
                 <c-win-room-admin ondatachanged={handleDataChanged}></c-win-room-admin>

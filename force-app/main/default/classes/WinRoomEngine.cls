@@ -259,7 +259,8 @@ public with sharing class WinRoomEngine {
         }
         Date today = Date.today();
         for (WR_Tender__c t : [
-            SELECT Id, Name, Account__c, Category__c, Deadline__c, Estimated_Value__c, Reference__c, Source__c, Country__c
+            SELECT Id, Name, Account__c, Category__c, Deadline__c, Estimated_Value__c, Reference__c, Source__c, Country__c,
+                   Buyer_Name__c
             FROM WR_Tender__c
             WHERE Account__c IN :accountIds AND Status__c = 'Open' AND Deadline__c >= :today
         ]) {
@@ -609,6 +610,9 @@ public with sharing class WinRoomEngine {
                 'Estimated value' => money(t.Estimated_Value__c),
                 'Source' => nvl(t.Source__c, '-')
             };
+            if (String.isNotBlank(t.Buyer_Name__c)) {
+                facts.put('Buyer', t.Buyer_Name__c);
+            }
             Date due = t.Deadline__c.addDays(-14) > Date.today() ? t.Deadline__c.addDays(-14) : Date.today();
             out.add(build(r, a, 'Tender', r.Category__c, 'Tender: ' + t.Name.left(80) + ' (' + days + ' days)', value,
                 rationale, facts, new List<String>(), null, null, t.Id, urgency, due));

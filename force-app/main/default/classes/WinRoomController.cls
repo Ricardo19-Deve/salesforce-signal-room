@@ -8,6 +8,8 @@
  *                 completeSession, sessionBrief, searchUsers
  *  Market         getMarket, importMarket, autoMatchMarket, setMarketMapping, searchAllAccounts
  *  Contracts      getContracts, getContract, saveContract, deleteContract
+ *  Tenders        getTenders, syncTenders, saveTenderSource, scheduleTenderSync, autoMatchTenders,
+ *                 setTenderMapping, setTenderStatus
  *  Admin          getRules, saveRule, resetRules, runEngine, getRuns, getProfiles,
  *                 updateProfile, generateMockData, purgeMockData, getJobStatus
  */
@@ -416,7 +418,7 @@ public with sharing class WinRoomController {
             ORDER BY CloseDate LIMIT 20
         ];
         List<WR_Tender__c> tenders = [
-            SELECT Id, Name, Reference__c, Category__c, Deadline__c, Estimated_Value__c, Status__c, Source__c
+            SELECT Id, Name, Reference__c, Category__c, Deadline__c, Estimated_Value__c, Status__c, Source__c, URL__c
             FROM WR_Tender__c WHERE Account__c = :accountId ORDER BY Deadline__c DESC
         ];
         return new Map<String, Object>{
@@ -540,7 +542,7 @@ public with sharing class WinRoomController {
         binds.put('in30', in30);
         List<WR_Tender__c> tenders = Database.queryWithBinds(
             'SELECT Id, Name, Account__c, Account__r.Name, Category__c, Deadline__c, Estimated_Value__c, Reference__c '
-            + 'FROM WR_Tender__c WHERE Status__c = \'Open\' AND Deadline__c >= :today AND Deadline__c <= :in30'
+            + 'FROM WR_Tender__c WHERE Status__c = \'Open\' AND Account__c != null AND Deadline__c >= :today AND Deadline__c <= :in30'
             + teamFilter + ' ORDER BY Deadline__c', binds, AccessLevel.USER_MODE);
         List<WR_Commitment__c> commitments = [
             SELECT Id, Name, Action__c, Due_Date__c, Status__c, Outcome__c, Owner_User__c, Owner_User__r.Name,
@@ -814,6 +816,155 @@ public with sharing class WinRoomController {
     public static void setMarketMapping(Id siteId, Id accountId, String status) {
         requireAdmin();
         WinRoomMarket.setMapping(siteId, accountId, status);
+    }
+
+    // ================================================================== tenders
+
+    @AuraEnabled
+    public static Map<String, Object> getTenders(String filterJson) {
+        Map<String, Object> f = String.isBlank(filterJson)
+            ? new Map<String, Object>() : (Map<String, Object>) JSON.deserializeUntyped(filterJson);
+        String search = (String) f.get('search');
+        String source = (String) f.get('source');
+        String country = (String) f.get('country');
+        String category = (String) f.get('category');
+        String status = (String) f.get('status');
+        String mapping = (String) f.get('mapping');
+        Map<String, Object> binds = new Map<String, Object>{ 'today' => Date.today() };
+        String cond = 'WHERE Id != null';
+        if (String.isNotBlank(search)) {
+            binds.put('search', '%' + search.trim() + '%');
+            cond += ' AND (Name LIKE :search OR Title__c LIKE :search OR Buyer_Name__c LIKE :search OR Account__r.Name LIKE :search)';
+        }
+        if (String.isNotBlank(source)) {
+            binds.put('source', source);
+            cond += ' AND Source__c = :source';
+        }
+        if (String.isNotBlank(country)) {
+            binds.put('country', country);
+            cond += ' AND Country__c = :country';
+        }
+        if (String.isNotBlank(category)) {
+            binds.put('category', category);
+            cond += ' AND Category__c = :category';
+        }
+        if (String.isBlank(status) || status == 'Open') {
+            cond += ' AND Status__c = \'Open\' AND (Deadline__c = null OR Deadline__c >= :today)';
+        } else if (status != 'All') {
+            binds.put('status', status);
+            cond += ' AND Status__c = :status';
+        }
+        if (mapping == 'Mapped') {
+            cond += ' AND Account__c != null';
+        } else if (mapping == 'Demo') {
+            cond += ' AND Is_Demo__c = true';
+        } else if (String.isNotBlank(mapping)) {
+            binds.put('mapping', mapping);
+            cond += ' AND Account__c = null AND Match_Status__c = :mapping AND Is_Demo__c = false';
+        }
+        List<Map<String, Object>> rows = new List<Map<String, Object>>();
+        for (WR_Tender__c t : (List<WR_Tender__c>) Database.queryWithBinds(
+                'SELECT Id, Name, Title__c, Buyer_Name__c, Country__c, Category__c, Publication_Date__c, Deadline__c, '
+                + 'Estimated_Value__c, Original_Value__c, Currency__c, Status__c, Source__c, URL__c, CPV_Codes__c, '
+                + 'Reference__c, Description__c, Account__c, Account__r.Name, Suggested_Account__c, '
+                + 'Suggested_Account__r.Name, Match_Status__c, Match_Score__c, Is_Demo__c '
+                + 'FROM WR_Tender__c ' + cond + ' ORDER BY Deadline__c ASC NULLS LAST LIMIT 500',
+                binds, AccessLevel.USER_MODE)) {
+            rows.add(new Map<String, Object>{
+                'id' => t.Id, 'name' => t.Name, 'title' => String.isBlank(t.Title__c) ? t.Name : t.Title__c,
+                'buyer' => t.Buyer_Name__c, 'country' => t.Country__c, 'category' => t.Category__c,
+                'published' => t.Publication_Date__c, 'deadline' => t.Deadline__c,
+                'daysLeft' => t.Deadline__c == null ? null : Date.today().daysBetween(t.Deadline__c),
+                'value' => t.Estimated_Value__c, 'originalValue' => t.Original_Value__c, 'currencyCode' => t.Currency__c,
+                'status' => t.Status__c, 'source' => t.Source__c, 'url' => t.URL__c, 'cpv' => t.CPV_Codes__c,
+                'reference' => t.Reference__c, 'description' => t.Description__c,
+                'accountId' => t.Account__c, 'accountName' => t.Account__r?.Name,
+                'suggestedId' => t.Suggested_Account__c, 'suggestedName' => t.Suggested_Account__r?.Name,
+                'matchStatus' => t.Is_Demo__c ? 'Demo' : t.Match_Status__c, 'score' => t.Match_Score__c,
+                'isDemo' => t.Is_Demo__c
+            });
+        }
+
+        Date in30 = Date.today().addDays(30);
+        Integer open = 0;
+        Integer linked = 0;
+        Decimal openValue = 0;
+        for (AggregateResult ar : [
+            SELECT COUNT(Id) n, SUM(Estimated_Value__c) v, COUNT(Account__c) linked FROM WR_Tender__c
+            WHERE Status__c = 'Open' AND Deadline__c >= TODAY
+        ]) {
+            open = (Integer) ar.get('n');
+            linked = (Integer) ar.get('linked');
+            openValue = ar.get('v') == null ? 0 : (Decimal) ar.get('v');
+        }
+        Integer closingSoon = [
+            SELECT COUNT() FROM WR_Tender__c WHERE Status__c = 'Open' AND Deadline__c >= TODAY AND Deadline__c <= :in30
+        ];
+        List<String> countries = new List<String>();
+        for (AggregateResult ar : [SELECT Country__c c FROM WR_Tender__c WHERE Country__c != null GROUP BY Country__c ORDER BY Country__c]) {
+            countries.add((String) ar.get('c'));
+        }
+        List<String> sourceNames = new List<String>();
+        for (AggregateResult ar : [SELECT Source__c s FROM WR_Tender__c WHERE Source__c != null GROUP BY Source__c ORDER BY Source__c]) {
+            sourceNames.add((String) ar.get('s'));
+        }
+        List<WR_Tender_Source__c> feeds = [
+            SELECT Id, Name, Code__c, Active__c, CPV_Prefixes__c, Countries__c, Lookback_Days__c, Max_Pages__c,
+                   Last_Run__c, Last_Status__c, Last_Fetched__c, Last_Imported__c
+            FROM WR_Tender_Source__c ORDER BY Code__c DESC
+        ];
+        return new Map<String, Object>{
+            'rows' => rows,
+            'open' => open,
+            'openValue' => openValue,
+            'closingSoon' => closingSoon,
+            'linked' => linked,
+            'countries' => countries,
+            'sources' => sourceNames,
+            'feeds' => feeds,
+            'scheduled' => WinRoomTenderSync.isScheduled()
+        };
+    }
+
+    @AuraEnabled
+    public static Id syncTenders() {
+        requireAdmin();
+        WinRoomTenders.sources();
+        return WinRoomTenderSync.launch();
+    }
+
+    @AuraEnabled
+    public static void saveTenderSource(WR_Tender_Source__c source) {
+        requireAdmin();
+        update as user new WR_Tender_Source__c(
+            Id = source.Id, Active__c = source.Active__c, CPV_Prefixes__c = source.CPV_Prefixes__c,
+            Countries__c = source.Countries__c, Lookback_Days__c = source.Lookback_Days__c, Max_Pages__c = source.Max_Pages__c
+        );
+    }
+
+    @AuraEnabled
+    public static void scheduleTenderSync(Boolean enabled) {
+        requireAdmin();
+        WinRoomTenders.sources();
+        WinRoomTenderSync.schedule(enabled == true);
+    }
+
+    @AuraEnabled
+    public static Map<String, Integer> autoMatchTenders() {
+        requireAdmin();
+        return WinRoomTenders.autoMatch();
+    }
+
+    @AuraEnabled
+    public static void setTenderMapping(Id tenderId, Id accountId, String status) {
+        requireAdmin();
+        WinRoomTenders.setMapping(tenderId, accountId, status);
+    }
+
+    @AuraEnabled
+    public static void setTenderStatus(Id tenderId, String status) {
+        requireAdmin();
+        update as user new WR_Tender__c(Id = tenderId, Status__c = status);
     }
 
     @AuraEnabled

@@ -69,5 +69,5 @@ Rules are `WR_Rule__c` records, edited in **Rules & Data → Rules**. **Reset to
 1. Map each ERP material to a product line code.
 2. Load monthly sell-in into `WR_Sales__c` (account, product line, period = first day of the month, units, revenue, an external key for upserts). Use 24 months for full year-over-year comparisons.
 3. Create one `WR_Account_Profile__c` per account with segment, size and procedures, and set the rollout phase and in-scope flag.
-4. Optionally load surgeon affiliations and tenders.
+4. Optionally load surgeon affiliations. Tenders can come from the public sync (**Tenders → Sync now**) or be loaded into `WR_Tender__c`.
 5. Run the engine (or schedule `WinRoomBenchmarkBatch.launch()`).

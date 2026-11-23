@@ -18,7 +18,8 @@
 | `WR_Account_Profile__c` | One per account: country, segment, size, knee / hip procedures per year, rollout phase, in-scope flag, rep. It keeps `Account` untouched. |
 | `WR_Sales__c` | Monthly units and revenue per account × product line (and surgeon when known). In production this is loaded from the ERP. |
 | `WR_Surgeon__c`, `WR_Affiliation__c` | Surgeons and the hospitals where they operate (primary or secondary site, start date, source). |
-| `WR_Tender__c` | Public tenders (reference, category, deadline, estimated value, status). |
+| `WR_Tender__c` | Public tenders: reference, title, buyer, country, category, CPV codes, deadline, value (notice currency and EUR), status, link to the notice, matched account (or suggestion and score). Demo tenders carry `Is_Demo__c`. |
+| `WR_Tender_Source__c` | One per portal (TED, Find a Tender, Public Contracts Scotland): active flag, CPV prefixes, countries, lookback, last run and result. |
 | `WR_Rule__c` | Rule configuration (see [rules.md](rules.md)). |
 | `WR_Run__c` | Engine run log: accounts processed, pointers new / updated / expired, errors. |
 | `WR_Pointer__c` | The opportunity: type, category, value, score, priority, rationale, evidence JSON, playbook, AI insight, decision, linked Opportunity, signature. |
@@ -46,6 +47,8 @@ WinRoomEngineBatch (in-scope accounts, 5 per execute)
 **Contracts.** `WinRoomContracts.evaluate()` compares committed and delivered units per month and line, and returns variance, cumulative variance, the 6-month run-rate, the projection at term end and a status. The portal and the `CONTRACT_*` rules use the same calculation. Contract pointers are kept apart from the one-pointer-per-product dedupe: a shortfall against a commitment is a different conversation from churn.
 
 **Market volumes.** The registry CSV is parsed in the browser (`winRoomMarket`), so large files never reach Apex; `WinRoomMarket` upserts the aggregates, matches hospitals to accounts with a token index and copies the volumes of linked hospitals into the account profiles.
+
+**Tenders.** `WinRoomTenderSync` is a batch with one item per source (Find a Tender: one per 30-day window), so each portal gets its own callout and heap limits; every item does all its callouts first, then the DML. `WinRoomTenders` builds the requests, parses TED's search response and OCDS release packages into one shape, converts values to EUR (org currency rates, or indicative rates in single-currency orgs), skips notices already stored from another portal (hash of buyer + title), and matches buyers to accounts of the same country. `finish()` closes notices whose deadline passed and runs the matching. Only tenders linked to an account reach the engine.
 
 **Signature** = rule code | account | product line | surgeon | tender (| contract for contract pointers). It identifies a pointer across runs, so the engine can run daily or after every data load.
 
