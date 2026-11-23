@@ -36,6 +36,7 @@ public with sharing class WinRoomEngine {
         public Set<Id> surgeonsWithSales = new Set<Id>();
         public List<WR_Affiliation__c> affiliations = new List<WR_Affiliation__c>();
         public List<WR_Tender__c> tenders = new List<WR_Tender__c>();
+        public List<WinRoomContracts.ContractResult> contracts = new List<WinRoomContracts.ContractResult>();
     }
 
     public class SaveResult {
@@ -264,6 +265,13 @@ public with sharing class WinRoomEngine {
         ]) {
             data.get(t.Account__c).tenders.add(t);
         }
+        if (hasContractRules()) {
+            List<WR_Contract__c> contracts = Database.query(WinRoomContracts.contractQuery()
+                + ' WHERE Account__c IN :accountIds AND Status__c = \'Active\'');
+            for (WinRoomContracts.ContractResult c : WinRoomContracts.evaluate(contracts, asOf)) {
+                data.get(c.accountId).contracts.add(c);
+            }
+        }
         return data;
     }
 
@@ -283,14 +291,17 @@ public with sharing class WinRoomEngine {
                 when 'NEW_SURGEON' { all.addAll(newSurgeon(r, a)); }
                 when 'TENDER_RADAR' { all.addAll(tenderRadar(r, a)); }
                 when 'SHARE_OF_WALLET' { all.addAll(shareOfWallet(r, a)); }
+                when 'CONTRACT_COMPLIANCE' { all.addAll(contractCompliance(r, a)); }
+                when 'CONTRACT_RENEWAL' { all.addAll(contractRenewal(r, a)); }
             }
         }
+        // Contract pointers are kept apart: a shortfall against a commitment is a different conversation.
         // One pointer per customer x product. A specific signal (churn, switch, attach gap) always beats the generic
         // peer comparison; between specific signals the highest score wins.
         Map<String, WR_Pointer__c> best = new Map<String, WR_Pointer__c>();
         List<WR_Pointer__c> out = new List<WR_Pointer__c>();
         for (WR_Pointer__c p : all) {
-            if (p.Product_Line__c == null) {
+            if (p.Product_Line__c == null || p.Contract__c != null) {
                 out.add(p);
                 continue;
             }
@@ -642,11 +653,118 @@ public with sharing class WinRoomEngine {
         return out;
     }
 
+    private Boolean hasContractRules() {
+        for (WR_Rule__c r : rules) {
+            if (r.Rule_Type__c == 'CONTRACT_COMPLIANCE' || r.Rule_Type__c == 'CONTRACT_RENEWAL') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Shortfall when delivered volume to date is below the commitment beyond the threshold and the recent run-rate
+     * is too; overrun when both are above. Value = annual revenue gap at the current run-rate (or the backlog).
+     */
+    private List<WR_Pointer__c> contractCompliance(WR_Rule__c r, AccountData a) {
+        List<WR_Pointer__c> out = new List<WR_Pointer__c>();
+        Decimal threshold = pctOr(r.Threshold_Pct__c, 10);
+        for (WinRoomContracts.ContractResult c : a.contracts) {
+            for (WinRoomContracts.LineResult l : c.lines) {
+                if (l.variancePct == null || l.runRatePct == null || l.monthlyQty == 0) {
+                    continue;
+                }
+                Boolean shortfall = l.status == 'Under' && l.runRatePct < -threshold;
+                Boolean overrun = l.status == 'Over' && l.runRatePct > threshold;
+                if (!shortfall && !overrun) {
+                    continue;
+                }
+                Decimal annualGap = (l.runRate - l.monthlyQty).abs() * 12 * l.unitPrice;
+                Decimal backlog = (0 - l.varianceUnits) * l.unitPrice;
+                Decimal value = shortfall ? Math.max(annualGap, backlog) : annualGap;
+                if (value < nz(r.Min_Value__c)) {
+                    continue;
+                }
+                String rationale = c.name + ' commits ' + l.monthlyQty.setScale(0) + ' ' + l.label + ' per month. Since '
+                    + c.comparedFrom.format() + ' ' + l.deliveredToDate.setScale(0) + ' were delivered against '
+                    + l.committedToDate.setScale(0) + ' committed (' + signedPct(l.variancePct) + '); the last '
+                    + WinRoomContracts.RUN_RATE_MONTHS + ' months run at ' + l.runRate.setScale(1) + ' per month ('
+                    + signedPct(l.runRatePct) + '). '
+                    + (shortfall
+                        ? 'At this rate the term ends ' + l.projectedVariance.abs().setScale(0) + ' units short. Value at stake ' + money(value) + ' per year.'
+                        : 'The account buys ' + money(value) + ' per year above the commitment, outside the contracted terms.');
+                Map<String, Object> facts = new Map<String, Object>{
+                    'Contract' => c.name,
+                    'Committed / month' => l.monthlyQty.setScale(0),
+                    'Delivered to date' => l.deliveredToDate.setScale(0) + ' / ' + l.committedToDate.setScale(0),
+                    'Variance to date' => signedPct(l.variancePct),
+                    'Run-rate (' + WinRoomContracts.RUN_RATE_MONTHS + 'm)' => l.runRate.setScale(1),
+                    'Projected at term end' => l.projectedTotal + ' / ' + l.totalCommitment.setScale(0)
+                };
+                WR_Pointer__c p = build(r, a, shortfall ? 'Contract shortfall' : 'Contract overrun',
+                    shortfall ? WinRoomRules.CAT_WINBACK : WinRoomRules.CAT_XSELL,
+                    (shortfall ? 'Contract shortfall: ' : 'Contract overrun: ') + l.label + ' (' + signedPct(l.variancePct) + ')',
+                    value, rationale, facts, new List<String>(), l.productLineId, null, null, c.contractId,
+                    shortfall ? 85 : 45, Date.today().addDays(shortfall ? 14 : 30));
+                p.Evidence__c = JSON.serialize(new Map<String, Object>{
+                    'facts' => facts,
+                    'months' => l.months,
+                    'series' => new List<Object>{
+                        new Map<String, Object>{ 'label' => 'Committed', 'unit' => 'units', 'values' => l.committed },
+                        new Map<String, Object>{ 'label' => 'Delivered', 'unit' => 'units', 'values' => l.delivered }
+                    },
+                    'rule' => r.Name
+                });
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
+    /** Active contract ending within Lookback months: plan the renewal. Value = annual contract value. */
+    private List<WR_Pointer__c> contractRenewal(WR_Rule__c r, AccountData a) {
+        List<WR_Pointer__c> out = new List<WR_Pointer__c>();
+        Date horizon = Date.today().addMonths(intOr(r.Lookback_Months__c, 6));
+        for (WinRoomContracts.ContractResult c : a.contracts) {
+            if (c.endDate == null || c.endDate < Date.today() || c.endDate > horizon || c.annualValue < nz(r.Min_Value__c)) {
+                continue;
+            }
+            Integer days = Date.today().daysBetween(c.endDate);
+            String compliance = c.compliancePct == null ? 'no delivery data yet'
+                : 'delivered ' + pctText(c.compliancePct) + ' of the committed value to date';
+            String rationale = c.name + ' (' + nvl(c.reference, '-') + ') ends on ' + c.endDate.format() + ' - ' + days
+                + ' days left. Annual contract value ' + money(c.annualValue) + '; ' + compliance + ' (' + c.health + ').';
+            Map<String, Object> facts = new Map<String, Object>{
+                'Contract' => c.name,
+                'Ends' => c.endDate.format(),
+                'Days left' => days,
+                'Annual value' => money(c.annualValue),
+                'Compliance to date' => c.compliancePct == null ? '-' : pctText(c.compliancePct)
+            };
+            Date due = c.endDate.addDays(-90) > Date.today() ? c.endDate.addDays(-90) : Date.today().addDays(7);
+            out.add(build(r, a, 'Contract renewal', r.Category__c, 'Contract renewal: ' + c.name.left(80) + ' (' + days + ' days)',
+                c.annualValue, rationale, facts, new List<String>(), null, null, null, c.contractId,
+                days <= 90 ? 100 : 70, due));
+        }
+        return out;
+    }
+
+    private static String signedPct(Decimal ratio) {
+        return (ratio >= 0 ? '+' : '') + pctText(ratio);
+    }
+
     // ------------------------------------------------------------------ pointer factory
 
     private WR_Pointer__c build(WR_Rule__c r, AccountData a, String type, String category, String title,
             Decimal value, String rationale, Map<String, Object> facts, List<String> chartLines, Id lineId,
             Id surgeonId, Id tenderId, Integer urgency, Date due) {
+        return build(r, a, type, category, title, value, rationale, facts, chartLines, lineId, surgeonId, tenderId,
+            null, urgency, due);
+    }
+
+    private WR_Pointer__c build(WR_Rule__c r, AccountData a, String type, String category, String title,
+            Decimal value, String rationale, Map<String, Object> facts, List<String> chartLines, Id lineId,
+            Id surgeonId, Id tenderId, Id contractId, Integer urgency, Date due) {
         Decimal rounded = value.setScale(0, RoundingMode.HALF_UP);
         Integer score = score(rounded, r.Weight__c, urgency);
         Map<String, Object> evidence = new Map<String, Object>{
@@ -662,6 +780,7 @@ public with sharing class WinRoomEngine {
             Product_Line__c = lineId,
             Surgeon__c = surgeonId,
             Tender__c = tenderId,
+            Contract__c = contractId,
             Rule__c = r.Id,
             Run__c = runId,
             Type__c = type,
@@ -674,7 +793,7 @@ public with sharing class WinRoomEngine {
             Next_Best_Action__c = r.Next_Best_Action__c,
             Assigned_To__c = a.profile.Rep__c != null ? a.profile.Rep__c : a.profile.Account__r?.OwnerId,
             Signature__c = (r.Code__c + '|' + a.profile.Account__c + '|' + nvl(lineId, '') + '|'
-                + nvl(surgeonId, '') + '|' + nvl(tenderId, '')).left(255),
+                + nvl(surgeonId, '') + '|' + nvl(tenderId, '') + (contractId == null ? '' : '|' + contractId)).left(255),
             Last_Detected__c = Datetime.now(),
             Due_Date__c = due,
             Is_Demo__c = a.profile.Is_Demo__c

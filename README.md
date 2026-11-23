@@ -1,17 +1,19 @@
 # Salesforce Win Room
 
-A **win room** for field sales, built natively on Salesforce with Apex and Lightning Web Components. A rules engine reads monthly sell-in and finds **customer-level opportunities** ("pointers"). Reps review them with the numbers behind each one and an optional AI summary, then accept, reject or turn them into Opportunities. A **weekly win room** asks the same 7 questions every 7 days, so the opportunities turn into committed actions.
+A **win room** for field sales, built natively on Salesforce with Apex and Lightning Web Components. A rules engine reads monthly sell-in and finds **customer-level opportunities** ("pointers"). Reps review them with the numbers behind each one and an optional AI summary, then accept, reject or turn them into Opportunities. A **weekly win room** asks the same 7 questions every 7 days, so the opportunities turn into committed actions. **Contracts** track committed volumes against what was delivered, and a **market** view shows hospital procedure volumes from a public registry.
 
-This is a neutral open-source reference with fictitious data. The demo domain is orthopaedic implants (knees, hips, surgical robots) sold to hospitals, but the engine, the data model and the portal are generic.
+This is a neutral open-source reference with fictitious data. The demo domain is orthopaedic implants (knees, hips, surgical robots) sold to hospitals, but the engine, the data model and the portal are generic. The only real data is optional and public: the UK National Joint Registry procedure volumes, which you download yourself (they are not included in the repository).
 
 | Module | What it shows |
 | --- | --- |
-| **Rules engine** | 13 configurable rules in 9 types, in four categories: **win back** (soft / hard churn, partial switch to a competitor), **cross-sell** (component pull-through, capital pull-through, white space vs. peer hospitals), **surgeons & site expansion** (surgeon uses us at another hospital, new surgeon) and **new accounts & tenders** (tender radar, low share of wallet / greenfield). Two batches (peer benchmarks, then evaluation) scale to large customer bases. |
+| **Rules engine** | 15 configurable rules in 11 types, in four categories: **win back** (soft / hard churn, partial switch to a competitor), **cross-sell** (component pull-through, capital pull-through, white space vs. peer hospitals), **surgeons & site expansion** (surgeon uses us at another hospital, new surgeon) and **new accounts & tenders** (tender radar, low share of wallet / greenfield, contract renewal). Contract rules flag **shortfalls** and **overruns** against the committed volume. Two batches (peer benchmarks, then evaluation) scale to large customer bases. |
 | **Explainable pointers** | Every pointer stores the facts that triggered it, a monthly chart and a plain-language rationale. Value at stake and a 0–100 priority score (value, rule weight, urgency) rank the work. There is **one pointer per customer × product**, and a specific signal always beats the generic peer comparison. |
 | **Safe re-runs** | Pointers are matched on a signature. Re-running the engine updates the numbers but **never overwrites a rep's decision**, and undecided pointers that are no longer detected expire. |
 | **Activation** | Accept, reject with a reason (the dashboard shows the acceptance rate per rule, a feedback loop for tuning), or create an Opportunity in the org's first open stage, linked to the pointer. |
 | **AI "why and what"** | Optional. An OpenAI-compatible model, reached through a **Named Credential** (`Win_Room_LLM`), writes the why, the what, next best actions, talking points, discovery questions and risks, plus a briefing for the win room facilitator. Without it, a rule-based summary is shown, so nothing breaks. |
 | **Weekly win room** | Sessions per team, with the 7 questions: wins and losses, new pointers, accepted pointers without action, overdue commitments, stuck opportunities, tenders closing soon, and commitments for next week. |
+| **Contracts** | Volume commitments per account and product line (e.g. *10 cups per month for 3 years*). Committed vs delivered month by month, cumulative variance, 6-month run-rate, projection at term end and a status (On track / Under / Over against a tolerance). Under-delivery becomes a win-back pointer, over-delivery a renegotiation pointer, and contracts ending within 6 months a renewal pointer. |
+| **Market (public registry)** | Upload the public CSV export of the UK **National Joint Registry** (NJR StatsOnline): the browser keeps the last 24 complete months and stores one record per hospital with its hip / knee volumes and trend. Hospitals are matched to Accounts by hospital or trust name (suggestions need a distinctive shared word; admins confirm). Mapped accounts use the real volumes for share of wallet and peer sizing. No scraping and no callout. |
 | **Admin without code** | Thresholds, windows, product lines and playbooks are edited in the portal. The engine runs on demand, account scope is set per rollout phase, and demo data can be generated and purged. |
 | **Neutral UI** | Custom dropdowns, switches and buttons render the same in every org, whatever the org's brand colour. The portal runs as a Lightning tab or full screen on an Experience Cloud (LWR) site. |
 
@@ -25,7 +27,9 @@ Captured in a Developer Edition org with the demo data (fictitious hospitals, su
 | ![Pointers](docs/images/03-pointers.png) Pointers: search, filters, priority score, due dates | ![Pointer](docs/images/05-pointer-insight.png) Pointer: rationale, facts, monthly chart, AI insight, playbook, commitments |
 | ![Create opportunity](docs/images/06-create-opportunity.png) Create an Opportunity from an accepted pointer | ![Account 360](docs/images/07-account-360.png) Account 360: revenue trend, pointers by category, product lines, surgeons |
 | ![Win room](docs/images/08-win-room.png) Weekly win room: same 7 questions every 7 days | ![Rules](docs/images/09-rules.png) Rules: thresholds, windows, product lines, playbooks |
-| ![Data](docs/images/10-data.png) Data: demo data, purge and account scope by rollout phase | |
+| ![Data](docs/images/10-data.png) Data: demo data, purge and account scope by rollout phase | ![Contracts](docs/images/11-contracts.png) Contracts: health, delivered vs committed, variance, renewals |
+| ![Contract](docs/images/12-contract-detail.png) Contract: committed vs delivered per month, run-rate and projection per line | ![Contract pointer](docs/images/14-contract-pointer.png) Contract shortfall pointer with the delivery chart |
+| ![Market](docs/images/13-market.png) Market: public NJR hospital volumes (NHS file). The demo accounts are fictitious, so the hospitals stay unlinked | |
 
 ## How it works
 
@@ -37,6 +41,8 @@ flowchart LR
         A[(WR_Affiliation__c<br/>surgeon x hospital)]
         T[(WR_Tender__c)]
         R[(WR_Rule__c)]
+        K[(WR_Contract__c<br/>+ lines)]
+        M[(WR_Market_Site__c<br/>registry volumes)]
     end
     subgraph Engine
         B[WinRoomBenchmarkBatch<br/>peer benchmarks]
@@ -51,7 +57,8 @@ flowchart LR
         AD[Rules & Data]
     end
     S & P --> B --> E --> W
-    S & A & T & R --> W
+    S & A & T & R & K --> W
+    M -->|mapped volumes| P
     W --> PO[(WR_Pointer__c)]
     PO --> D & PT & AC & WR
     PT -->|accept / reject / convert| PO
@@ -81,6 +88,7 @@ Open the **Win Room** app. The seed creates 10 fictitious hospitals and runs the
 - **Reps** get `Win_Room_User` (review pointers, decide, run win rooms). **Admins** get `Win_Room_Admin` (rules, engine runs, demo data, scope).
 - **Storage.** A Developer Edition org has 5 MB of data. The demo generator detects it and switches to compact mode (18 months of history, about 2,000 sales rows). Other orgs get 24 months.
 - **AI (optional).** Create an External Credential with your API key and a Named Credential called `Win_Room_LLM` pointing at an OpenAI-compatible API (for example `https://api.openai.com`), and give users access to the principal. No key is stored in this repository.
+- **Market (optional, public data).** Download *Download all NJR statistics* (NHS and/or Independent Sector CSV) from [NJR StatsOnline](https://surgeonprofile.njrcentre.org.uk/Home/StatsIndex) and use **Market → Import NJR CSV**. The data is © NJR; check its terms before any commercial use. In a Developer Edition org the NHS file alone (about 260 hospitals) fits in the 5 MB of storage next to the demo data.
 - **Portal.** Add the `winRoomApp` component to an LWR Experience Cloud page and set *Full screen* to show it as a standalone portal.
 
 ## Demo script (10 minutes)
@@ -94,7 +102,12 @@ Open the **Win Room** app. The seed creates 10 fictitious hospitals and runs the
 4. **Win room.** Team **GB**, planned session.
    - Walk through the 7 questions and add a commitment with an owner and a due date.
    - **AI briefing** prepares the facilitator.
-5. **Rules & Data.**
+5. **Contracts.** Open **Knee system agreement - St Aldric University Hospital**.
+   - Femoral components are on track; tibial trays run at about half of the commitment, so the contract is *Under* and the projection ends far below the term commitment.
+   - The *Contract shortfall* pointer carries the same chart into the pointer list and the win room.
+   - Show the *Over* contract (renegotiate the tier) and the one ending within 6 months (renewal).
+6. **Market.** With the NJR file imported, sort by volume: every hospital with its hip and knee procedures, trend and market value; link a hospital to an account to switch its profile to real volumes.
+7. **Rules & Data.**
    - Change *Soft churn* from 25% to 30%, then **Run engine now**: decisions are kept and pointers update.
    - Show the account scope by rollout phase.
 
@@ -104,8 +117,8 @@ Reset before a demo: **Rules & Data → Data → Purge demo data**, then **Gener
 
 ## Tests
 
-- **Apex:** 12 tests in `WinRoomTest`, run as a user with the `Win_Room_Admin` permission set, so user-mode access is tested too. All passed in a Developer Edition org on 23 Nov 2026 (classes 87–100% covered). They plant every pattern, run the engine and check that each pointer type is found, that re-runs keep decisions and create no duplicates, the pointer lifecycle, the win room agenda and the AI parsing (mocked callout) and fallback.
-- **JavaScript:** `npm test` runs Jest on `winRoomUtils` and `winRoomSelect` (12 tests). `npm run lint` runs ESLint.
+- **Apex:** 16 tests in `WinRoomTest`, run as a user with the `Win_Room_Admin` permission set, so user-mode access is tested too. All passed in a Developer Edition org on 23 Nov 2026 (classes 87–100% covered). They plant every pattern, run the engine and check that each pointer type is found, that re-runs keep decisions and create no duplicates, the pointer lifecycle, the win room agenda, the AI parsing (mocked callout) and fallback, contract compliance and renewal pointers, the contract editor, and the registry import, name matching and volume mapping (with fictitious registry rows).
+- **JavaScript:** `npm test` runs Jest on `winRoomUtils`, `winRoomSelect` and the registry CSV parser in `winRoomMarket` (14 tests). `npm run lint` runs ESLint.
 - **CI:** every push runs ESLint and Jest. To run the Apex tests too, add a repository secret `DEVHUB_SFDX_AUTH_URL` with the *Sfdx Auth Url* of a Dev Hub. The job then creates a one-day scratch org, deploys, runs the tests and deletes the org.
 
 ## Project structure
@@ -114,12 +127,14 @@ Reset before a demo: **Rules & Data → Data → Purge demo data**, then **Gener
 force-app/main/default/
   classes/           WinRoomEngine (rules, scoring), WinRoomBenchmarkBatch, WinRoomEngineBatch,
                      WinRoomRules (defaults), WinRoomController (portal API), WinRoomAIService,
+                     WinRoomContracts (compliance), WinRoomMarket (registry import and matching),
                      WinRoomMockData + WinRoomMockDataBatch (demo data), WinRoomTest
   lwc/               winRoomApp (shell) and the views: winRoomDashboard, winRoomPointers,
-                     winRoomPointerDetail, winRoomAccount360, winRoomSession, winRoomAdmin;
+                     winRoomPointerDetail, winRoomAccount360, winRoomSession, winRoomContracts, winRoomMarket, winRoomAdmin;
                      shared: winRoomSelect, winRoomSegmented, winRoomLineChart, winRoomUtils, winRoomStyles
   objects/           WR_Sales__c, WR_Product_Line__c, WR_Account_Profile__c, WR_Surgeon__c, WR_Affiliation__c,
-                     WR_Tender__c, WR_Rule__c, WR_Run__c, WR_Pointer__c, WR_Session__c, WR_Commitment__c
+                     WR_Tender__c, WR_Rule__c, WR_Run__c, WR_Pointer__c, WR_Session__c, WR_Commitment__c,
+                     WR_Contract__c, WR_Contract_Line__c, WR_Market_Site__c
   permissionsets/    Win_Room_User, Win_Room_Admin
   customPermissions/ Win_Room_Admin
   applications/ tabs/

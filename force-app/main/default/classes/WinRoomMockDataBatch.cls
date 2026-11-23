@@ -71,7 +71,10 @@ public with sharing class WinRoomMockDataBatch implements Database.Batchable<SOb
                 ? surgeons.get(p.Account__c) : new List<WR_Affiliation__c>();
             rows.addAll(WinRoomMockData.salesFor(p, archetypeByProfile.get(p.Id), lines, split, asOf, compact));
         }
-        upsert rows External_Key__c;
+        // Replace, not upsert: months that now have no units (e.g. after real registry volumes shrank the account)
+        // must not keep the rows of a previous generation.
+        delete [SELECT Id FROM WR_Sales__c WHERE Account__c IN :accountIds AND Is_Demo__c = true];
+        insert rows;
     }
 
     public void finish(Database.BatchableContext bc) {

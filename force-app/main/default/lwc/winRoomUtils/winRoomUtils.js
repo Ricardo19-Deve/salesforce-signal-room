@@ -23,6 +23,7 @@ export const REJECTION_REASONS = [
 
 export function money(value) {
     const v = Number(value || 0);
+    if (v < 0) return `-${money(-v)}`;
     const abs = Math.abs(v);
     if (abs >= 1000000) return `€${(v / 1000000).toFixed(2)}M`;
     if (abs >= 1000) return `€${(v / 1000).toFixed(abs >= 100000 ? 0 : 1)}k`;

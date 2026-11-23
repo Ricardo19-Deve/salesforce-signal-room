@@ -63,7 +63,7 @@ private class WinRoomTest {
 
             Assert.areEqual(4, [SELECT COUNT() FROM WR_Account_Profile__c]);
             Assert.isTrue([SELECT COUNT() FROM WR_Sales__c] > 0, 'sales generated');
-            Assert.areEqual(13, [SELECT COUNT() FROM WR_Rule__c]);
+            Assert.areEqual(WinRoomRules.defaultRules().size(), [SELECT COUNT() FROM WR_Rule__c]);
 
             Set<String> types = new Set<String>();
             for (AggregateResult ar : [SELECT Type__c t FROM WR_Pointer__c GROUP BY Type__c]) {
@@ -129,7 +129,7 @@ private class WinRoomTest {
             Map<String, Object> a360 = WinRoomController.getAccount360(accountId);
             Assert.isFalse(((List<Object>) a360.get('series')).isEmpty());
 
-            Assert.areEqual(13, WinRoomController.getRules().size());
+            Assert.areEqual(WinRoomRules.defaultRules().size(), WinRoomController.getRules().size());
             Assert.areEqual(13, WinRoomController.getProductLines().size());
             Assert.isFalse(WinRoomController.getProfiles().isEmpty());
             Assert.isTrue((Integer) WinRoomController.getDataStats().get('sales') > 0);
@@ -305,5 +305,138 @@ private class WinRoomTest {
             Assert.areEqual(0.55, WinRoomMockData.pattern(0, 'KNEE_FEM', 2));
             Assert.areEqual(1, WinRoomMockData.pattern(7, 'KNEE_FEM', 2));
         }
+    }
+
+    // ------------------------------------------------------------------ contracts
+
+    @IsTest
+    static void contractsTrackComplianceAndRaisePointers() {
+        System.runAs(wrUser()) {
+            seedAndRun();
+            // Archetypes 0 (soft churn) and 2 (tibia switch) get demo contracts that under-deliver.
+            Assert.areEqual(2, [SELECT COUNT() FROM WR_Contract__c]);
+            Map<String, Object> view = WinRoomController.getContracts(null);
+            Map<String, Integer> byHealth = (Map<String, Integer>) view.get('byHealth');
+            Assert.isTrue(byHealth.get('Under') >= 1, 'under-delivering contract: ' + byHealth);
+            Assert.isFalse([SELECT Id FROM WR_Pointer__c WHERE Type__c = 'Contract shortfall'].isEmpty(), 'shortfall pointer');
+
+            WR_Contract__c c = [SELECT Id FROM WR_Contract__c LIMIT 1];
+            Map<String, Object> detail = WinRoomController.getContract(c.Id);
+            WinRoomContracts.ContractResult r = (WinRoomContracts.ContractResult) detail.get('contract');
+            Assert.isFalse(r.lines.isEmpty());
+            Assert.areEqual(r.lines[0].months.size(), r.lines[0].delivered.size());
+            Assert.isNotNull(r.compliancePct);
+            WinRoomController.getContracts(JSON.serialize(new Map<String, Object>{ 'health' => 'Renewal', 'search' => 'agreement' }));
+        }
+    }
+
+    @IsTest
+    static void contractEditorAndRenewal() {
+        System.runAs(wrUser()) {
+            seedAndRun();
+            Account a = [SELECT Id FROM Account WHERE Name = 'Test Hospital Charlie'];
+            WR_Product_Line__c cup = [SELECT Id FROM WR_Product_Line__c WHERE Code__c = 'HIP_CUP'];
+            try {
+                WinRoomController.saveContract(JSON.serialize(new Map<String, Object>{
+                    'contract' => new Map<String, Object>{ 'name' => 'x' }, 'lines' => new List<Object>()
+                }));
+                Assert.fail('account and dates are required');
+            } catch (AuraHandledException e) {
+                Assert.isTrue(e.getMessage().contains('required'));
+            }
+            Id contractId = WinRoomController.saveContract(JSON.serialize(new Map<String, Object>{
+                'contract' => new Map<String, Object>{
+                    'name' => 'Hip framework', 'reference' => 'TEST-1', 'accountId' => a.Id,
+                    'startDate' => String.valueOf(Date.today().addMonths(-30)), 'endDate' => String.valueOf(Date.today().addMonths(3)),
+                    'status' => 'Active', 'tolerance' => 10
+                },
+                'lines' => new List<Object>{ new Map<String, Object>{ 'productLineId' => cup.Id, 'label' => 'Primary hips', 'monthlyQty' => 10, 'unitPrice' => 900 } },
+                'deletedLineIds' => new List<Object>()
+            }));
+            WinRoomEngine.runNow();
+            Assert.isFalse([SELECT Id FROM WR_Pointer__c WHERE Type__c = 'Contract renewal' AND Contract__c = :contractId].isEmpty(), 'renewal pointer');
+
+            WR_Contract_Line__c line = [SELECT Id FROM WR_Contract_Line__c WHERE Contract__c = :contractId];
+            WinRoomController.saveContract(JSON.serialize(new Map<String, Object>{
+                'contract' => new Map<String, Object>{
+                    'id' => contractId, 'name' => 'Hip framework', 'accountId' => a.Id,
+                    'startDate' => String.valueOf(Date.today().addMonths(-30)), 'endDate' => String.valueOf(Date.today().addMonths(3))
+                },
+                'lines' => new List<Object>(),
+                'deletedLineIds' => new List<Object>{ line.Id }
+            }));
+            Assert.areEqual(0, [SELECT COUNT() FROM WR_Contract_Line__c WHERE Contract__c = :contractId]);
+            WinRoomController.deleteContract(contractId);
+            Assert.areEqual(0, [SELECT COUNT() FROM WR_Contract__c WHERE Id = :contractId]);
+        }
+    }
+
+    // ------------------------------------------------------------------ market (registry)
+
+    private static String sitesJson() {
+        List<Object> sites = new List<Object>();
+        List<String> months = new List<String>{ 'Jan 26', 'Feb 26' };
+        sites.add(new Map<String, Object>{
+            'key' => 'NHS|R1|Test Hospital Alpha', 'name' => 'Test Hospital Alpha', 'providerType' => 'NHS', 'orgCode' => 'R1',
+            'orgName' => 'Alpha NHS Foundation Trust', 'region' => 'London', 'hip12' => 400, 'knee12' => 500, 'hipPrior' => 380,
+            'kneePrior' => 450, 'total12' => 950, 'months' => months, 'hip' => new List<Integer>{ 30, 35 },
+            'knee' => new List<Integer>{ 40, 42 }, 'asOf' => '2026-10-01'
+        });
+        sites.add(new Map<String, Object>{
+            'key' => 'NHS|R2|Bravo Community Site', 'name' => 'Bravo Community Site', 'providerType' => 'NHS', 'orgCode' => 'R2',
+            'orgName' => 'Somewhere Else Trust', 'region' => 'London', 'hip12' => 100, 'knee12' => 80, 'hipPrior' => 90,
+            'kneePrior' => 70, 'total12' => 190, 'months' => months, 'hip' => new List<Integer>{ 8, 9 },
+            'knee' => new List<Integer>{ 6, 7 }, 'asOf' => '2026-10-01'
+        });
+        sites.add(new Map<String, Object>{
+            'key' => 'Independent Sector|C1|Nowhere Clinic', 'name' => 'Nowhere Clinic', 'providerType' => 'Independent Sector',
+            'orgCode' => 'C1', 'orgName' => 'Private Group', 'region' => 'North West', 'hip12' => 50, 'knee12' => 60,
+            'hipPrior' => 0, 'kneePrior' => 0, 'total12' => 110, 'months' => months, 'hip' => new List<Integer>{ 4, 5 },
+            'knee' => new List<Integer>{ 5, 5 }, 'asOf' => '2026-10-01'
+        });
+        return JSON.serialize(sites);
+    }
+
+    @IsTest
+    static void marketImportMatchesAccountsAndAppliesVolumes() {
+        System.runAs(wrUser()) {
+            Assert.areEqual(3, WinRoomController.importMarket(sitesJson()));
+            Assert.areEqual(3, WinRoomController.importMarket(sitesJson()), 're-import upserts');
+            Assert.areEqual(3, [SELECT COUNT() FROM WR_Market_Site__c]);
+
+            Map<String, Integer> counts = WinRoomController.autoMatchMarket();
+            Assert.areEqual(1, counts.get('auto'), String.valueOf(counts));
+            Account alpha = [SELECT Id FROM Account WHERE Name = 'Test Hospital Alpha'];
+            WR_Account_Profile__c p = [
+                SELECT Hip_Procedures__c, Knee_Procedures__c, Volume_Source__c FROM WR_Account_Profile__c WHERE Account__c = :alpha.Id
+            ];
+            Assert.areEqual('NJR', p.Volume_Source__c);
+            Assert.areEqual(400, p.Hip_Procedures__c);
+
+            // Link a second hospital manually: volumes add up on the account.
+            WR_Market_Site__c bravo = [SELECT Id FROM WR_Market_Site__c WHERE Name = 'Bravo Community Site'];
+            WinRoomController.setMarketMapping(bravo.Id, alpha.Id, 'Confirmed');
+            Assert.areEqual(500, [SELECT Hip_Procedures__c FROM WR_Account_Profile__c WHERE Account__c = :alpha.Id].Hip_Procedures__c);
+
+            Map<String, Object> market = WinRoomController.getMarket(JSON.serialize(new Map<String, Object>{ 'status' => 'Mapped' }));
+            Assert.areEqual(2, ((List<Object>) market.get('rows')).size());
+            WinRoomController.getMarket(JSON.serialize(new Map<String, Object>{
+                'search' => 'Clinic', 'region' => 'North West', 'provider' => 'Independent Sector', 'status' => 'Unmatched'
+            }));
+            Assert.isNotNull(WinRoomController.getAccount360(alpha.Id).get('market'));
+
+            WinRoomController.setMarketMapping(bravo.Id, null, 'Ignored');
+            Assert.areEqual('Ignored', [SELECT Match_Status__c FROM WR_Market_Site__c WHERE Id = :bravo.Id].Match_Status__c);
+            Assert.isFalse(WinRoomController.searchAllAccounts('Test').isEmpty());
+        }
+    }
+
+    @IsTest
+    static void nameMatchingIgnoresNoiseWords() {
+        Set<String> a = WinRoomMarket.tokens('Abbot\'s and St Elmo\'s NHS Foundation Trust');
+        Set<String> b = WinRoomMarket.tokens('Abbots & Saint Elmos Hospital');
+        Assert.areEqual(new Set<String>{ 'abbots', 'st', 'elmos' }, a);
+        Assert.areEqual(1, WinRoomMarket.dice(a, b));
+        Assert.areEqual(0, WinRoomMarket.dice(a, new Set<String>()));
     }
 }

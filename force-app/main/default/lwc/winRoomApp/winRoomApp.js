@@ -6,7 +6,9 @@ const VIEWS = [
     { view: "dashboard", label: "Dashboard", icon: "utility:home", subtitle: "Where the value is and how the field is acting on it" },
     { view: "pointers", label: "Pointers", icon: "utility:lightning_extension", subtitle: "Customer-level opportunities identified by the engine" },
     { view: "account", label: "Account 360", icon: "utility:company", subtitle: "One hospital: trend, product lines, surgeons, tenders and pointers" },
-    { view: "winroom", label: "Win Room", icon: "utility:groups", subtitle: "Same 7 questions every 7 days" }
+    { view: "winroom", label: "Win Room", icon: "utility:groups", subtitle: "Same 7 questions every 7 days" },
+    { view: "contracts", label: "Contracts", icon: "utility:contract", subtitle: "Committed volumes vs delivered, month by month" },
+    { view: "market", label: "Market", icon: "utility:world", subtitle: "Hospital procedure volumes from the national joint registry" }
 ];
 const ADMIN_VIEWS = [{ view: "admin", label: "Rules & Data", icon: "utility:settings", subtitle: "Rules, engine runs, demo data and account scope" }];
 const SCOPE_KEY = "winRoom.scope";
@@ -67,6 +69,12 @@ export default class WinRoomApp extends LightningElement {
     }
     get isWinRoom() {
         return this.view === "winroom";
+    }
+    get isContracts() {
+        return this.view === "contracts";
+    }
+    get isMarket() {
+        return this.view === "market";
     }
     get isAdminView() {
         return this.view === "admin";

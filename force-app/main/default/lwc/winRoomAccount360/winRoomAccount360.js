@@ -88,7 +88,12 @@ export default class WinRoomAccount360 extends LightningElement {
             { key: "rev", label: "Contoso revenue last 12 months", value: money(last), hint: growth === null || growth === undefined ? "" : `${growth >= 0 ? "+" : ""}${pct(growth, 1)} last 6 months vs a year earlier` },
             { key: "sow", label: "Est. share of wallet", value: market ? pct(last / market) : "–", hint: `market ≈ ${money(market)} / yr` },
             { key: "open", label: "Open value at stake", value: money(openValue), hint: `${open.length} open pointers` },
-            { key: "proc", label: "Procedures / yr", value: `${this.profile.Knee_Procedures__c || 0} knees`, hint: `${this.profile.Hip_Procedures__c || 0} hips` }
+            {
+                key: "proc",
+                label: "Procedures / yr",
+                value: `${this.profile.Knee_Procedures__c || 0} knees`,
+                hint: `${this.profile.Hip_Procedures__c || 0} hips · ${this.profile.Volume_Source__c === "NJR" ? "registry (NJR)" : "estimate"}`
+            }
         ];
     }
     get quadrants() {
@@ -141,6 +146,34 @@ export default class WinRoomAccount360 extends LightningElement {
     }
     get opportunities() {
         return (this.data.opportunities || []).map((o) => ({ ...o, amount: money(o.Amount), close: formatDate(o.CloseDate) }));
+    }
+    get contracts() {
+        const cls = { Under: "wr-health wr-health_under", Over: "wr-health wr-health_over", "On track": "wr-health wr-health_ok" };
+        return (this.data.contracts || []).map((c) => ({
+            ...c,
+            healthClass: cls[c.health] || "wr-health",
+            complianceText: pct(c.compliancePct),
+            term: `${formatDate(c.startDate)} – ${formatDate(c.endDate)}`,
+            lineText: (c.lines || []).map((l) => `${l.label}: ${l.deliveredToDate} / ${l.committedToDate}`).join(" · ")
+        }));
+    }
+    get hasContracts() {
+        return this.contracts.length > 0;
+    }
+    get market() {
+        return this.data.market;
+    }
+    get hasMarket() {
+        return !!(this.data && this.data.market);
+    }
+    get marketSites() {
+        return ((this.market && this.market.sites) || []).map((s, i) => ({ ...s, key: `m${i}` }));
+    }
+    get marketAsOf() {
+        return this.market && this.market.asOf ? formatDate(this.market.asOf) : "";
+    }
+    openContracts() {
+        this.dispatchEvent(new CustomEvent("openview", { detail: { view: "contracts" } }));
     }
     get hasTenders() {
         return this.tenders.length > 0;

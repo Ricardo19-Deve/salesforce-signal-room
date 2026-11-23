@@ -59,6 +59,21 @@
                 <default>false</default>
                 <label>Share of wallet</label>
             </value>
+            <value>
+                <fullName>Contract shortfall</fullName>
+                <default>false</default>
+                <label>Contract shortfall</label>
+            </value>
+            <value>
+                <fullName>Contract overrun</fullName>
+                <default>false</default>
+                <label>Contract overrun</label>
+            </value>
+            <value>
+                <fullName>Contract renewal</fullName>
+                <default>false</default>
+                <label>Contract renewal</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

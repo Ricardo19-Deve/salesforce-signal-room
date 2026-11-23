@@ -310,3 +310,19 @@
 .wr-tab_active { color: var(--wr-ink); font-weight: 600; border-bottom-color: var(--wr-navy); }
 .wr-mt-xs { margin-top: 0.5rem; }
 .wr-mt-s { margin-top: 0.8rem; }
+.wr-health {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 0.5rem;
+    border-radius: 6px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    background: #f3f5f8;
+    color: var(--wr-ink-2);
+    border: 1px solid var(--wr-line);
+}
+.wr-health_ok { background: #edf7f0; color: var(--wr-good); border-color: #cfe8d7; }
+.wr-health_under { background: #fdf0ef; color: var(--wr-bad); border-color: #f6d3d0; }
+.wr-health_over { background: #fdf5e7; color: var(--wr-warn); border-color: #f2dfb8; }

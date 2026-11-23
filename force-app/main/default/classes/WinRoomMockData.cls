@@ -54,9 +54,16 @@ public with sharing class WinRoomMockData {
         for (WR_Account_Profile__c p : profiles) {
             archetypeByProfile.put(p.Id, archetypes.get(p.Account__c));
         }
+        // Real registry volumes (e.g. NJR for UK hospitals) replace the estimates before sales are generated.
+        Set<Id> accountIds = new Set<Id>();
+        for (WR_Account_Profile__c p : profiles) {
+            accountIds.add(p.Account__c);
+        }
+        WinRoomMarket.applyVolumes(accountIds);
         buildSurgeons(profiles);
         buildTenders(profiles);
         buildSessions();
+        buildContracts(archetypes);
         return Database.executeBatch(new WinRoomMockDataBatch(archetypeByProfile, runEngine, compact), 4);
     }
 
@@ -68,6 +75,8 @@ public with sharing class WinRoomMockData {
     /** Removes the demo records that are small in volume. Called at the end of the purge batch. */
     public static void purgeSmallObjects() {
         delete [SELECT Id FROM WR_Commitment__c WHERE Is_Demo__c = true OR Pointer__r.Is_Demo__c = true];
+        delete [SELECT Id FROM WR_Contract_Line__c WHERE Is_Demo__c = true];
+        delete [SELECT Id FROM WR_Contract__c WHERE Is_Demo__c = true];
         delete [SELECT Id FROM WR_Pointer__c WHERE Is_Demo__c = true];
         delete [SELECT Id FROM WR_Session__c WHERE Is_Demo__c = true];
         delete [SELECT Id FROM WR_Tender__c WHERE Is_Demo__c = true];
@@ -349,13 +358,13 @@ public with sharing class WinRoomMockData {
         );
     }
 
-    // ------------------------------------------------------------------ sales
+    private static final String PRICE_FACTOR = '_priceFactor';
 
-    /** Builds 24 months of sell-in for one account. Used by WinRoomMockDataBatch. */
-    public static List<WR_Sales__c> salesFor(WR_Account_Profile__c p, Integer archetype,
-            Map<String, WR_Product_Line__c> lines, List<WR_Affiliation__c> surgeons, Date asOf, Boolean compact) {
-        Integer history = compact == true ? COMPACT_HISTORY_MONTHS : HISTORY_MONTHS;
-        Rng rng = new Rng(p.Account__c);
+    /**
+     * Base monthly units per product line before seasonality, patterns and noise. Consumes the account's random
+     * sequence in a fixed order, so salesFor() and the demo contracts see the same numbers.
+     */
+    public static Map<String, Decimal> baseUnits(WR_Account_Profile__c p, Integer archetype, Rng rng) {
         Decimal share = archetype == 6 ? 0.06 : 0.25 + rng.next() * 0.3;
         Decimal kneeCases = (p.Knee_Procedures__c == null ? 0 : p.Knee_Procedures__c) / 12 * share;
         Decimal hipCases = (p.Hip_Procedures__c == null ? 0 : p.Hip_Procedures__c) / 12 * share;
@@ -365,6 +374,7 @@ public with sharing class WinRoomMockData {
         Decimal priceFactor = 0.95 + rng.next() * 0.1;
 
         Map<String, Decimal> base = new Map<String, Decimal>();
+        base.put(PRICE_FACTOR, priceFactor);
         base.put('KNEE_FEM', kneeCases * 0.85);
         base.put('KNEE_TIB', kneeCases * 0.85);
         base.put('KNEE_PAT', archetype == 3 ? 0 : kneeCases * 0.85 * 0.65);
@@ -378,6 +388,111 @@ public with sharing class WinRoomMockData {
         base.put('HIP_HEAD', hipCases * 0.9);
         base.put('ROBOT_KNEE', p.Has_Robot__c ? kneeCases * 0.85 * 0.5 : 0);
         base.put('ROBOT_HIP', robotHip ? hipCases * 0.3 : 0);
+        return base;
+    }
+
+    // ------------------------------------------------------------------ contracts
+
+    /**
+     * Demo volume contracts on in-scope accounts, sized from the same base units as the sales so each one has a
+     * known outcome: archetype 0 / 2 / 4 under-deliver (churn, tibia switch, cups stopped), 5 over-delivers
+     * (commitment set at 75% of the run-rate), 7 is on track and ends in 4 months (renewal).
+     */
+    private static void buildContracts(Map<Id, Integer> archetypes) {
+        Map<String, WR_Product_Line__c> lines = new Map<String, WR_Product_Line__c>();
+        for (WR_Product_Line__c l : [SELECT Id, Code__c, Name, Avg_Price__c FROM WR_Product_Line__c]) {
+            lines.put(l.Code__c, l);
+        }
+        Date monthStart = WinRoomEngine.defaultAsOf();
+        List<WR_Contract__c> contracts = new List<WR_Contract__c>();
+        Map<String, List<WR_Contract_Line__c>> linesByRef = new Map<String, List<WR_Contract_Line__c>>();
+        for (WR_Account_Profile__c p : [
+            SELECT Id, Name, Account__c, Country__c, Knee_Procedures__c, Hip_Procedures__c, Has_Robot__c, In_Scope__c
+            FROM WR_Account_Profile__c WHERE Account__c IN :archetypes.keySet() AND In_Scope__c = true AND Is_Demo__c = true
+        ]) {
+            Integer archetype = archetypes.get(p.Account__c);
+            Map<String, Decimal> base = baseUnits(p, archetype, new Rng(p.Account__c));
+            String ref = 'CT-' + p.Country__c + '-' + String.valueOf(p.Account__c).right(6);
+            Date start = monthStart.addMonths(-14);
+            Date endDate = start.addMonths(36).addDays(-1);
+            String name;
+            List<WR_Contract_Line__c> cl = new List<WR_Contract_Line__c>();
+            switch on archetype {
+                when 0 {
+                    name = 'Knee system agreement';
+                    cl.add(contractLine(lines.get('KNEE_FEM'), 'Primary knees (femoral components)', base.get('KNEE_FEM')));
+                }
+                when 2 {
+                    name = 'Knee system agreement';
+                    cl.add(contractLine(lines.get('KNEE_FEM'), 'Primary knees (femoral components)', base.get('KNEE_FEM')));
+                    cl.add(contractLine(lines.get('KNEE_TIB'), 'Tibial trays', base.get('KNEE_TIB')));
+                }
+                when 4 {
+                    name = 'Hip framework agreement';
+                    cl.add(contractLine(lines.get('HIP_CUP'), 'Primary hips (cups)', base.get('HIP_CUP')));
+                }
+                when 5 {
+                    name = 'Hip framework agreement';
+                    cl.add(contractLine(lines.get('HIP_STEM_T'), 'Hip stems', base.get('HIP_STEM_T') * 0.75));
+                }
+                when 7 {
+                    name = 'Knee and hip agreement';
+                    start = monthStart.addMonths(-32);
+                    endDate = monthStart.addMonths(4).addDays(-1);
+                    cl.add(contractLine(lines.get('KNEE_FEM'), 'Primary knees (femoral components)', base.get('KNEE_FEM')));
+                    cl.add(contractLine(lines.get('HIP_CUP'), 'Primary hips (cups)', base.get('HIP_CUP')));
+                }
+            }
+            // Very small hospitals (a handful of cases a month) get no volume contract in the demo.
+            for (Integer i = cl.size() - 1; i >= 0; i--) {
+                if (cl[i].Monthly_Qty__c < 2) {
+                    cl.remove(i);
+                }
+            }
+            if (name == null || cl.isEmpty()) {
+                continue;
+            }
+            contracts.add(new WR_Contract__c(
+                Name = (name + ' - ' + p.Name).left(80), Reference__c = ref, Account__c = p.Account__c,
+                Start_Date__c = start, End_Date__c = endDate, Status__c = 'Active', Tolerance_Pct__c = 10,
+                Notes__c = 'Demo contract. Committed volumes are monthly units per product line.', Is_Demo__c = true
+            ));
+            linesByRef.put(ref, cl);
+        }
+        // Demo contracts are rebuilt from scratch so they always match the regenerated sales.
+        Set<Id> accountIds = archetypes.keySet();
+        delete [SELECT Id FROM WR_Contract_Line__c WHERE Is_Demo__c = true AND Contract__r.Account__c IN :accountIds];
+        delete [SELECT Id FROM WR_Contract__c WHERE Is_Demo__c = true AND Account__c IN :accountIds];
+        insert contracts;
+        List<WR_Contract_Line__c> allLines = new List<WR_Contract_Line__c>();
+        for (WR_Contract__c c : contracts) {
+            for (WR_Contract_Line__c l : linesByRef.get(c.Reference__c)) {
+                l.Contract__c = c.Id;
+                allLines.add(l);
+            }
+        }
+        insert allLines;
+    }
+
+    private static WR_Contract_Line__c contractLine(WR_Product_Line__c line, String label, Decimal monthly) {
+        Decimal qty = (monthly == null ? 0 : monthly).round(System.RoundingMode.HALF_UP);
+        return new WR_Contract_Line__c(
+            Product_Line__c = line.Id, Label__c = label, Monthly_Qty__c = qty,
+            Unit_Price__c = ((line.Avg_Price__c == null ? 0 : line.Avg_Price__c) * 0.92).setScale(2), Is_Demo__c = true
+        );
+    }
+
+    // ------------------------------------------------------------------ sales
+
+    /** Builds 24 months of sell-in for one account. Used by WinRoomMockDataBatch. */
+    public static List<WR_Sales__c> salesFor(WR_Account_Profile__c p, Integer archetype,
+            Map<String, WR_Product_Line__c> lines, List<WR_Affiliation__c> surgeons, Date asOf, Boolean compact) {
+        Integer history = compact == true ? COMPACT_HISTORY_MONTHS : HISTORY_MONTHS;
+        Rng rng = new Rng(p.Account__c);
+        Map<String, Decimal> base = baseUnits(p, archetype, rng);
+        Decimal priceFactor = base.remove(PRICE_FACTOR);
+
+
 
         List<WR_Affiliation__c> knee = new List<WR_Affiliation__c>();
         List<WR_Affiliation__c> hip = new List<WR_Affiliation__c>();

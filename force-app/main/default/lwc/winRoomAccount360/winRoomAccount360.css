@@ -25,3 +25,4 @@
 .q-item:hover { background: var(--wr-hover); }
 .q-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nowrap { white-space: nowrap; }
+.market-sites { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }

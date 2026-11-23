@@ -6,6 +6,8 @@
  *  Account 360    searchAccounts, getAccount360
  *  Win Room       getSessions, createSession, getAgenda, saveCommitment, updateCommitment,
  *                 completeSession, sessionBrief, searchUsers
+ *  Market         getMarket, importMarket, autoMatchMarket, setMarketMapping, searchAllAccounts
+ *  Contracts      getContracts, getContract, saveContract, deleteContract
  *  Admin          getRules, saveRule, resetRules, runEngine, getRuns, getProfiles,
  *                 updateProfile, generateMockData, purgeMockData, getJobStatus
  */
@@ -307,7 +309,7 @@ public with sharing class WinRoomController {
         Account acc = [SELECT Id, Name, BillingCity, BillingCountry, Owner.Name FROM Account WHERE Id = :accountId];
         List<WR_Account_Profile__c> profiles = [
             SELECT Id, Country__c, Segment__c, Size_Band__c, Knee_Procedures__c, Hip_Procedures__c, Phase__c,
-                   In_Scope__c, Has_Robot__c, Rep__r.Name
+                   In_Scope__c, Has_Robot__c, Rep__r.Name, Volume_Source__c, Volume_As_Of__c
             FROM WR_Account_Profile__c WHERE Account__c = :accountId LIMIT 1
         ];
         Date asOf = WinRoomEngine.defaultAsOf();
@@ -428,7 +430,11 @@ public with sharing class WinRoomController {
             'affiliations' => affiliations,
             'pointers' => rows(pointers),
             'opportunities' => opps,
-            'tenders' => tenders
+            'tenders' => tenders,
+            'contracts' => WinRoomContracts.evaluate(
+                Database.query(WinRoomContracts.contractQuery() + ' WHERE Account__c = :accountId ORDER BY End_Date__c'),
+                asOf),
+            'market' => marketFor(accountId)
         };
     }
 
@@ -657,6 +663,354 @@ public with sharing class WinRoomController {
             out.add(new Map<String, Object>{ 'id' => u.Id, 'name' => u.Name, 'title' => u.Title });
         }
         return out;
+    }
+
+    // ================================================================== market (NJR)
+
+    /** Registry hospitals with volumes, mapping and our revenue / share of wallet for mapped accounts. */
+    @AuraEnabled
+    public static Map<String, Object> getMarket(String filterJson) {
+        Map<String, Object> f = String.isBlank(filterJson)
+            ? new Map<String, Object>() : (Map<String, Object>) JSON.deserializeUntyped(filterJson);
+        String search = (String) f.get('search');
+        String region = (String) f.get('region');
+        String provider = (String) f.get('provider');
+        String status = (String) f.get('status');
+        Map<String, Object> binds = new Map<String, Object>();
+        String cond = 'WHERE Id != null';
+        if (String.isNotBlank(search)) {
+            binds.put('search', '%' + search.trim() + '%');
+            cond += ' AND (Name LIKE :search OR Org_Name__c LIKE :search OR Account__r.Name LIKE :search)';
+        }
+        if (String.isNotBlank(region)) {
+            binds.put('region', region);
+            cond += ' AND Region__c = :region';
+        }
+        if (String.isNotBlank(provider)) {
+            binds.put('provider', provider);
+            cond += ' AND Provider_Type__c = :provider';
+        }
+        if (status == 'Mapped') {
+            binds.put('mapped', WinRoomMarket.MAPPED);
+            cond += ' AND Match_Status__c IN :mapped';
+        } else if (String.isNotBlank(status)) {
+            binds.put('status', status);
+            cond += ' AND Match_Status__c = :status';
+        }
+        List<WR_Market_Site__c> sites = Database.queryWithBinds(
+            'SELECT Id, Name, Org_Code__c, Org_Name__c, Region__c, Provider_Type__c, Hip_12m__c, Knee_12m__c, '
+            + 'Hip_Prior_12m__c, Knee_Prior_12m__c, Total_12m__c, Data_As_Of__c, Account__c, Account__r.Name, '
+            + 'Suggested_Account__c, Suggested_Account__r.Name, Match_Status__c, Match_Score__c '
+            + 'FROM WR_Market_Site__c ' + cond + ' ORDER BY Total_12m__c DESC NULLS LAST LIMIT 600',
+            binds, AccessLevel.USER_MODE);
+
+        Set<Id> accountIds = new Set<Id>();
+        for (WR_Market_Site__c s : sites) {
+            if (s.Account__c != null) {
+                accountIds.add(s.Account__c);
+            }
+        }
+        Date asOf = WinRoomEngine.defaultAsOf();
+        Date yearAgo = asOf.addMonths(-12);
+        Map<Id, Decimal> revenue = new Map<Id, Decimal>();
+        for (AggregateResult ar : [
+            SELECT Account__c a, SUM(Revenue__c) rev FROM WR_Sales__c
+            WHERE Account__c IN :accountIds AND Period__c >= :yearAgo AND Period__c < :asOf GROUP BY Account__c
+        ]) {
+            revenue.put((Id) ar.get('a'), (Decimal) ar.get('rev'));
+        }
+        // Market value of each mapped account = all its hospitals x basket price.
+        Decimal kneeBasket = WinRoomMarket.basket('Knee');
+        Decimal hipBasket = WinRoomMarket.basket('Hip');
+        Map<Id, Decimal> marketValue = new Map<Id, Decimal>();
+        for (AggregateResult ar : [
+            SELECT Account__c a, SUM(Hip_12m__c) hip, SUM(Knee_12m__c) knee FROM WR_Market_Site__c
+            WHERE Account__c IN :accountIds AND Match_Status__c IN :WinRoomMarket.MAPPED GROUP BY Account__c
+        ]) {
+            Decimal hip = (Decimal) ar.get('hip');
+            Decimal knee = (Decimal) ar.get('knee');
+            marketValue.put((Id) ar.get('a'), (hip == null ? 0 : hip) * hipBasket + (knee == null ? 0 : knee) * kneeBasket);
+        }
+
+        List<Map<String, Object>> rows = new List<Map<String, Object>>();
+        for (WR_Market_Site__c s : sites) {
+            Decimal hip = s.Hip_12m__c == null ? 0 : s.Hip_12m__c;
+            Decimal knee = s.Knee_12m__c == null ? 0 : s.Knee_12m__c;
+            Decimal prior = (s.Hip_Prior_12m__c == null ? 0 : s.Hip_Prior_12m__c) + (s.Knee_Prior_12m__c == null ? 0 : s.Knee_Prior_12m__c);
+            Decimal rev = s.Account__c == null ? null : revenue.get(s.Account__c);
+            Decimal mv = s.Account__c == null ? null : marketValue.get(s.Account__c);
+            rows.add(new Map<String, Object>{
+                'id' => s.Id, 'name' => s.Name, 'orgName' => s.Org_Name__c, 'orgCode' => s.Org_Code__c,
+                'region' => s.Region__c, 'provider' => s.Provider_Type__c, 'hip' => hip, 'knee' => knee,
+                'yoy' => prior > 0 ? (hip + knee - prior) / prior : null,
+                'marketValue' => hip * hipBasket + knee * kneeBasket,
+                'status' => s.Match_Status__c, 'score' => s.Match_Score__c,
+                'accountId' => s.Account__c, 'accountName' => s.Account__r?.Name,
+                'suggestedId' => s.Suggested_Account__c, 'suggestedName' => s.Suggested_Account__r?.Name,
+                'revenue' => rev,
+                'shareOfWallet' => rev != null && mv != null && mv > 0 ? rev / mv : null
+            });
+        }
+
+        Decimal totalVolume = 0;
+        Decimal mappedVolume = 0;
+        Integer siteCount = 0;
+        Integer mappedCount = 0;
+        Decimal hipTotal = 0;
+        Decimal kneeTotal = 0;
+        Date dataAsOf = null;
+        for (AggregateResult ar : [
+            SELECT Match_Status__c st, COUNT(Id) n, SUM(Hip_12m__c) hip, SUM(Knee_12m__c) knee, MAX(Data_As_Of__c) asOf
+            FROM WR_Market_Site__c GROUP BY Match_Status__c
+        ]) {
+            Decimal hip = ar.get('hip') == null ? 0 : (Decimal) ar.get('hip');
+            Decimal knee = ar.get('knee') == null ? 0 : (Decimal) ar.get('knee');
+            siteCount += (Integer) ar.get('n');
+            hipTotal += hip;
+            kneeTotal += knee;
+            totalVolume += hip + knee;
+            if (WinRoomMarket.MAPPED.contains((String) ar.get('st'))) {
+                mappedCount += (Integer) ar.get('n');
+                mappedVolume += hip + knee;
+            }
+            Date d = (Date) ar.get('asOf');
+            if (d != null && (dataAsOf == null || d > dataAsOf)) {
+                dataAsOf = d;
+            }
+        }
+        List<String> regions = new List<String>();
+        for (AggregateResult ar : [SELECT Region__c r FROM WR_Market_Site__c WHERE Region__c != null GROUP BY Region__c ORDER BY Region__c]) {
+            regions.add((String) ar.get('r'));
+        }
+        return new Map<String, Object>{
+            'rows' => rows,
+            'regions' => regions,
+            'sites' => siteCount,
+            'hip' => hipTotal,
+            'knee' => kneeTotal,
+            'mapped' => mappedCount,
+            'mappedShare' => totalVolume > 0 ? mappedVolume / totalVolume : null,
+            'asOf' => dataAsOf
+        };
+    }
+
+    @AuraEnabled
+    public static Integer importMarket(String sitesJson) {
+        requireAdmin();
+        try {
+            return WinRoomMarket.importSites(sitesJson);
+        } catch (Exception e) {
+            throw error('Import failed: ' + e.getMessage());
+        }
+    }
+
+    @AuraEnabled
+    public static Map<String, Integer> autoMatchMarket() {
+        requireAdmin();
+        return WinRoomMarket.autoMatch();
+    }
+
+    @AuraEnabled
+    public static void setMarketMapping(Id siteId, Id accountId, String status) {
+        requireAdmin();
+        WinRoomMarket.setMapping(siteId, accountId, status);
+    }
+
+    @AuraEnabled
+    public static List<Map<String, Object>> searchAllAccounts(String term) {
+        String likeTerm = '%' + (term == null ? '' : term.trim()) + '%';
+        List<Map<String, Object>> out = new List<Map<String, Object>>();
+        for (Account a : [
+            SELECT Id, Name, BillingCity, BillingCountry FROM Account WHERE Name LIKE :likeTerm ORDER BY Name LIMIT 15
+        ]) {
+            out.add(new Map<String, Object>{ 'id' => a.Id, 'name' => a.Name, 'city' => a.BillingCity, 'country' => a.BillingCountry });
+        }
+        return out;
+    }
+
+    private static Map<String, Object> marketFor(Id accountId) {
+        List<WR_Market_Site__c> sites = [
+            SELECT Id, Name, Org_Name__c, Region__c, Provider_Type__c, Hip_12m__c, Knee_12m__c, Hip_Prior_12m__c,
+                   Knee_Prior_12m__c, Monthly_JSON__c, Data_As_Of__c, Source__c
+            FROM WR_Market_Site__c WHERE Account__c = :accountId AND Match_Status__c IN :WinRoomMarket.MAPPED
+        ];
+        if (sites.isEmpty()) {
+            return null;
+        }
+        List<String> months;
+        List<Decimal> hip;
+        List<Decimal> knee;
+        List<Map<String, Object>> siteRows = new List<Map<String, Object>>();
+        for (WR_Market_Site__c s : sites) {
+            siteRows.add(new Map<String, Object>{
+                'name' => s.Name, 'orgName' => s.Org_Name__c, 'region' => s.Region__c, 'provider' => s.Provider_Type__c,
+                'hip' => s.Hip_12m__c, 'knee' => s.Knee_12m__c
+            });
+            if (String.isBlank(s.Monthly_JSON__c)) {
+                continue;
+            }
+            Map<String, Object> m = (Map<String, Object>) JSON.deserializeUntyped(s.Monthly_JSON__c);
+            List<Object> ms = (List<Object>) m.get('months');
+            List<Object> hs = (List<Object>) m.get('hip');
+            List<Object> ks = (List<Object>) m.get('knee');
+            if (ms == null || hs == null || ks == null) {
+                continue;
+            }
+            if (months == null) {
+                months = new List<String>();
+                hip = new List<Decimal>();
+                knee = new List<Decimal>();
+                for (Integer i = 0; i < ms.size(); i++) {
+                    months.add(String.valueOf(ms[i]));
+                    hip.add(0);
+                    knee.add(0);
+                }
+            }
+            for (Integer i = 0; i < Math.min(months.size(), hs.size()); i++) {
+                hip[i] += hs[i] == null ? 0 : Decimal.valueOf(String.valueOf(hs[i]));
+                knee[i] += ks[i] == null ? 0 : Decimal.valueOf(String.valueOf(ks[i]));
+            }
+        }
+        return new Map<String, Object>{
+            'sites' => siteRows,
+            'source' => sites[0].Source__c,
+            'asOf' => sites[0].Data_As_Of__c,
+            'months' => months,
+            'series' => months == null ? new List<Object>() : new List<Object>{
+                new Map<String, Object>{ 'label' => 'Hips (registry)', 'values' => hip },
+                new Map<String, Object>{ 'label' => 'Knees (registry)', 'values' => knee }
+            }
+        };
+    }
+
+    // ================================================================== contracts
+
+    @AuraEnabled
+    public static Map<String, Object> getContracts(String filterJson) {
+        Map<String, Object> f = String.isBlank(filterJson)
+            ? new Map<String, Object>() : (Map<String, Object>) JSON.deserializeUntyped(filterJson);
+        String search = (String) f.get('search');
+        String recordStatus = (String) f.get('recordStatus');
+        Map<String, Object> binds = new Map<String, Object>();
+        String cond = ' WHERE Id != null';
+        if (String.isNotBlank(search)) {
+            binds.put('search', '%' + search.trim() + '%');
+            cond += ' AND (Name LIKE :search OR Account__r.Name LIKE :search OR Reference__c LIKE :search)';
+        }
+        if (String.isNotBlank(recordStatus)) {
+            binds.put('recordStatus', recordStatus);
+            cond += ' AND Status__c = :recordStatus';
+        }
+        List<WR_Contract__c> contracts = Database.queryWithBinds(
+            WinRoomContracts.contractQuery() + cond + ' ORDER BY End_Date__c LIMIT 300', binds, AccessLevel.USER_MODE);
+        List<WinRoomContracts.ContractResult> results = WinRoomContracts.evaluate(contracts, WinRoomEngine.defaultAsOf());
+        String health = (String) f.get('health');
+        List<WinRoomContracts.ContractResult> filtered = new List<WinRoomContracts.ContractResult>();
+        Map<String, Integer> byHealth = new Map<String, Integer>{ 'On track' => 0, 'Under' => 0, 'Over' => 0, 'Not started' => 0 };
+        Decimal committed = 0;
+        Decimal delivered = 0;
+        Integer renewals = 0;
+        for (WinRoomContracts.ContractResult r : results) {
+            byHealth.put(r.health, byHealth.get(r.health) + 1);
+            committed += r.committedValue;
+            delivered += r.deliveredValue;
+            if (r.daysToEnd != null && r.daysToEnd >= 0 && r.daysToEnd <= 180) {
+                renewals++;
+            }
+            if (String.isBlank(health) || r.health == health || (health == 'Renewal' && r.daysToEnd != null && r.daysToEnd >= 0 && r.daysToEnd <= 180)) {
+                filtered.add(r);
+            }
+        }
+        return new Map<String, Object>{
+            'contracts' => filtered,
+            'byHealth' => byHealth,
+            'total' => results.size(),
+            'committedValue' => committed,
+            'deliveredValue' => delivered,
+            'compliance' => committed > 0 ? delivered / committed : null,
+            'renewals' => renewals
+        };
+    }
+
+    @AuraEnabled
+    public static Map<String, Object> getContract(Id contractId) {
+        List<WR_Contract__c> contracts = Database.query(WinRoomContracts.contractQuery() + ' WHERE Id = :contractId');
+        if (contracts.isEmpty()) {
+            throw error('Contract not found.');
+        }
+        List<WR_Pointer__c> pointers = [
+            SELECT Id, Name, Title__c, Account__c, Account__r.Name, Country__c, Product_Line__c, Product_Line__r.Name,
+                   Surgeon__c, Surgeon__r.Name, Tender__c, Tender__r.Name, Rule__c, Rule__r.Name, Type__c, Category__c,
+                   Status__c, Priority__c, Value_At_Stake__c, Score__c, Due_Date__c, Assigned_To__c, Assigned_To__r.Name,
+                   Opportunity__c, Opportunity__r.Name, Opportunity__r.StageName, Rejection_Reason__c, Last_Detected__c, CreatedDate
+            FROM WR_Pointer__c WHERE Contract__c = :contractId AND Status__c != 'Expired' ORDER BY Score__c DESC
+        ];
+        return new Map<String, Object>{
+            'contract' => WinRoomContracts.evaluate(contracts, WinRoomEngine.defaultAsOf())[0],
+            'pointers' => rows(pointers)
+        };
+    }
+
+    /** Creates or updates a contract and its lines: {contract:{...}, lines:[{id, productLineId, label, monthlyQty, unitPrice}], deletedLineIds:[]}. */
+    @AuraEnabled
+    public static Id saveContract(String contractJson) {
+        requireAdmin();
+        Map<String, Object> m = (Map<String, Object>) JSON.deserializeUntyped(contractJson);
+        Map<String, Object> c = (Map<String, Object>) m.get('contract');
+        if (c.get('accountId') == null || c.get('startDate') == null || c.get('endDate') == null || String.isBlank((String) c.get('name'))) {
+            throw error('Account, name, start and end date are required.');
+        }
+        WR_Contract__c rec = new WR_Contract__c(
+            Id = idOrNull(c.get('id')),
+            Name = ((String) c.get('name')).left(80),
+            Reference__c = String.isBlank((String) c.get('reference')) ? null : ((String) c.get('reference')).left(80),
+            Account__c = idOrNull(c.get('accountId')),
+            Start_Date__c = Date.valueOf((String) c.get('startDate')),
+            End_Date__c = Date.valueOf((String) c.get('endDate')),
+            Status__c = String.isBlank((String) c.get('status')) ? 'Active' : (String) c.get('status'),
+            Tolerance_Pct__c = c.get('tolerance') == null ? WinRoomContracts.DEFAULT_TOLERANCE : Decimal.valueOf(String.valueOf(c.get('tolerance'))),
+            Notes__c = (String) c.get('notes')
+        );
+        if (rec.End_Date__c < rec.Start_Date__c) {
+            throw error('The end date must be after the start date.');
+        }
+        upsert as user rec;
+        List<WR_Contract_Line__c> lines = new List<WR_Contract_Line__c>();
+        for (Object o : (List<Object>) m.get('lines')) {
+            Map<String, Object> l = (Map<String, Object>) o;
+            if (l.get('productLineId') == null || l.get('monthlyQty') == null) {
+                continue;
+            }
+            WR_Contract_Line__c line = new WR_Contract_Line__c(
+                Id = idOrNull(l.get('id')),
+                Product_Line__c = idOrNull(l.get('productLineId')),
+                Label__c = l.get('label') == null ? null : String.valueOf(l.get('label')).left(80),
+                Monthly_Qty__c = Decimal.valueOf(String.valueOf(l.get('monthlyQty'))),
+                Unit_Price__c = l.get('unitPrice') == null ? null : Decimal.valueOf(String.valueOf(l.get('unitPrice')))
+            );
+            if (line.Id == null) {
+                line.Contract__c = rec.Id;
+            }
+            lines.add(line);
+        }
+        upsert as user lines;
+        List<Id> deleted = new List<Id>();
+        if (m.get('deletedLineIds') != null) {
+            for (Object o : (List<Object>) m.get('deletedLineIds')) {
+                deleted.add(Id.valueOf(String.valueOf(o)));
+            }
+        }
+        if (!deleted.isEmpty()) {
+            delete as user [SELECT Id FROM WR_Contract_Line__c WHERE Id IN :deleted AND Contract__c = :rec.Id];
+        }
+        return rec.Id;
+    }
+
+    @AuraEnabled
+    public static void deleteContract(Id contractId) {
+        requireAdmin();
+        delete as user [SELECT Id FROM WR_Contract_Line__c WHERE Contract__c = :contractId];
+        delete as user new WR_Contract__c(Id = contractId);
     }
 
     // ================================================================== admin

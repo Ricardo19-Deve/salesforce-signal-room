@@ -65,6 +65,13 @@
                 <c-win-room-session refresh-key={refreshKey}
                     onopenpointer={handleOpenPointer} onopenaccount={handleOpenAccount}></c-win-room-session>
             </template>
+            <template lwc:if={isContracts}>
+                <c-win-room-contracts is-admin={isAdmin} refresh-key={refreshKey}
+                    onopenpointer={handleOpenPointer} onopenaccount={handleOpenAccount}></c-win-room-contracts>
+            </template>
+            <template lwc:if={isMarket}>
+                <c-win-room-market is-admin={isAdmin} ondatachanged={handleDataChanged}></c-win-room-market>
+            </template>
             <template lwc:if={isAdminView}>
                 <c-win-room-admin ondatachanged={handleDataChanged}></c-win-room-admin>
             </template>
