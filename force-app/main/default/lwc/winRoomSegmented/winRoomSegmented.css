@@ -1,0 +1,30 @@
+@import "c/winRoomStyles";
+:host { display: inline-block; }
+.group {
+    display: inline-flex;
+    background: #eef1f4;
+    border-radius: 9px;
+    padding: 3px;
+    gap: 2px;
+}
+.seg {
+    border: 0;
+    background: transparent;
+    height: 28px;
+    padding: 0 0.85rem;
+    border-radius: 7px;
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--wr-ink-2);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.seg:hover { color: var(--wr-ink); }
+.seg_on {
+    background: #fff;
+    color: var(--wr-ink);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+.seg:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wr-focus); }

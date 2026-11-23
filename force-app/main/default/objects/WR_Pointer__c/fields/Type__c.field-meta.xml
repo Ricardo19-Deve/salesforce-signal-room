@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Type__c</fullName>
+    <label>Type</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Win-back soft</fullName>
+                <default>false</default>
+                <label>Win-back soft</label>
+            </value>
+            <value>
+                <fullName>Win-back hard</fullName>
+                <default>false</default>
+                <label>Win-back hard</label>
+            </value>
+            <value>
+                <fullName>Partial switch</fullName>
+                <default>false</default>
+                <label>Partial switch</label>
+            </value>
+            <value>
+                <fullName>Cross-sell</fullName>
+                <default>false</default>
+                <label>Cross-sell</label>
+            </value>
+            <value>
+                <fullName>Peer white space</fullName>
+                <default>false</default>
+                <label>Peer white space</label>
+            </value>
+            <value>
+                <fullName>Capital pull-through</fullName>
+                <default>false</default>
+                <label>Capital pull-through</label>
+            </value>
+            <value>
+                <fullName>Surgeon site expansion</fullName>
+                <default>false</default>
+                <label>Surgeon site expansion</label>
+            </value>
+            <value>
+                <fullName>New surgeon</fullName>
+                <default>false</default>
+                <label>New surgeon</label>
+            </value>
+            <value>
+                <fullName>Tender</fullName>
+                <default>false</default>
+                <label>Tender</label>
+            </value>
+            <value>
+                <fullName>Share of wallet</fullName>
+                <default>false</default>
+                <label>Share of wallet</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

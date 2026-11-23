@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Segment__c</fullName>
+    <label>Segment</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>University Hospital</fullName>
+                <default>false</default>
+                <label>University Hospital</label>
+            </value>
+            <value>
+                <fullName>Public Hospital</fullName>
+                <default>false</default>
+                <label>Public Hospital</label>
+            </value>
+            <value>
+                <fullName>Private Clinic</fullName>
+                <default>false</default>
+                <label>Private Clinic</label>
+            </value>
+            <value>
+                <fullName>Orthopaedic Centre</fullName>
+                <default>false</default>
+                <label>Orthopaedic Centre</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

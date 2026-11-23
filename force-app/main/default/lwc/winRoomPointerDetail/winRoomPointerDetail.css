@@ -1,0 +1,31 @@
+@import "c/winRoomStyles";
+:host { display: block; }
+.detail { position: relative; min-height: 300px; }
+.head { background: #fff; border-bottom: 1px solid var(--wr-line); padding: 1.1rem 1.5rem 1.2rem; }
+.head-top { display: flex; justify-content: space-between; align-items: center; }
+.title { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.015em; margin: 0.35rem 0 0.5rem; line-height: 1.3; }
+.head-meta { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 1rem 0 0.9rem; border: 1px solid var(--wr-line); border-radius: 10px; }
+.stats > div { padding: 0.6rem 0.8rem; }
+.stats > div + div { border-left: 1px solid var(--wr-line); }
+.stat { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.015em; margin-top: 0.2rem; font-variant-numeric: tabular-nums; }
+.stat.small { font-size: 0.9rem; padding-top: 0.25rem; }
+.actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.decision { margin-top: 0.4rem; }
+.form { margin-top: 0.9rem; padding: 0.9rem; border: 1px solid var(--wr-line); border-radius: 10px; background: #fafbfc; display: flex; flex-direction: column; gap: 0.6rem; }
+.form-row { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; }
+.form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+.body { padding: 1rem 1.5rem 2rem; }
+.body > * + * { margin-top: 1rem; }
+.rationale { line-height: 1.45; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; margin-top: 0.8rem; }
+.fact { background: #f6f7f9; border-radius: 8px; padding: 0.55rem 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.chart { margin-top: 0.9rem; }
+.push { margin-left: auto; }
+.ai-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; margin-top: 0.7rem; }
+.bullets { margin: 0.25rem 0 0 1.1rem; list-style: disc; font-size: 0.82rem; }
+ol.bullets { list-style: decimal; }
+.bullets li { margin-bottom: 0.2rem; }
+.add { margin-top: 0.6rem; }
+.grow { flex: 1; min-width: 220px; }
+.nowrap { white-space: nowrap; }

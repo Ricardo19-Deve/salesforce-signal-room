@@ -1,0 +1,151 @@
+<template>
+    <div class="detail">
+        <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+        <template lwc:if={error}>
+            <div class="wr-alert wr-alert_error" role="alert">{error}</div>
+        </template>
+        <template lwc:if={ready}>
+            <div class="head">
+                <div class="head-top">
+                    <span class="wr-muted">{p.name} · {p.category} · {p.type}</span>
+                    <button type="button" class="wr-icon-btn" title="Close" aria-label="Close" onclick={close}><lightning-icon icon-name="utility:close" size="x-small"></lightning-icon></button>
+                </div>
+                <h2 class="title">{p.title}</h2>
+                <div class="head-meta">
+                    <span class={priorityCls}>{p.priority}</span>
+                    <span class={statusCls}>{p.status}</span>
+                    <span class="wr-link" onclick={openAccount}>{p.accountName}</span>
+                    <span class="wr-muted">{p.country}</span>
+                </div>
+                <div class="stats">
+                    <div><div class="wr-kpi-label">Value at stake / yr</div><div class="stat">{valueText}</div></div>
+                    <div><div class="wr-kpi-label">Priority score</div><div class="stat">{p.score}</div></div>
+                    <div><div class="wr-kpi-label">Due</div><div class="stat small">{dueText}</div></div>
+                    <div><div class="wr-kpi-label">Owner</div><div class="stat small">{p.assignedTo}</div></div>
+                </div>
+
+                <div class="actions">
+                    <template lwc:if={isNew}>
+                        <button type="button" class="wr-btn" onclick={accept} disabled={busy}><lightning-icon icon-name="utility:check" size="xx-small" class="wr-btn-icon"></lightning-icon>Accept</button>
+                    </template>
+                    <template lwc:if={canDecide}>
+                        <button type="button" class="wr-btn wr-btn_primary" onclick={startConvert} disabled={busy}><lightning-icon icon-name="utility:opportunity" size="xx-small" class="wr-btn-icon"></lightning-icon>Create opportunity</button>
+                        <button type="button" class="wr-btn wr-btn_danger-text" onclick={startReject} disabled={busy}><lightning-icon icon-name="utility:close" size="xx-small" class="wr-btn-icon"></lightning-icon>Reject</button>
+                    </template>
+                    <template lwc:if={isAccepted}>
+                        <button type="button" class="wr-btn" onclick={reopen} disabled={busy}>Back to new</button>
+                    </template>
+                    <template lwc:if={isClosed}>
+                        <button type="button" class="wr-btn" onclick={reopen} disabled={busy}><lightning-icon icon-name="utility:refresh" size="xx-small" class="wr-btn-icon"></lightning-icon>Re-open</button>
+                    </template>
+                    <template lwc:if={isConverted}>
+                        <button type="button" class="wr-btn" onclick={openOpportunity}><lightning-icon icon-name="utility:opportunity" size="xx-small" class="wr-btn-icon"></lightning-icon>{p.opportunityName}</button>
+                        <span class="wr-muted">Stage: {p.opportunityStage}</span>
+                    </template>
+                </div>
+                <template lwc:if={decisionText}><div class="wr-muted decision">{decisionText}</div></template>
+
+                <template lwc:if={rejecting}>
+                    <div class="form">
+                        <c-win-room-select variant="field" label="Why is this pointer not valid?" placeholder="Select a reason" value={rejectReason} options={reasonOptions} onchange={handleReason} required></c-win-room-select>
+                        <label class="wr-field"><span class="wr-field-label">Comment (helps tune the rule)</span><textarea class="wr-input wr-textarea" value={rejectComment} oninput={handleComment}></textarea></label>
+                        <div class="form-actions">
+                            <button type="button" class="wr-btn" onclick={cancelMode}>Cancel</button>
+                            <button type="button" class="wr-btn wr-btn_danger" onclick={confirmReject} disabled={busy}>Reject pointer</button>
+                        </div>
+                    </div>
+                </template>
+                <template lwc:if={converting}>
+                    <div class="form">
+                        <div class="wr-muted">Creates an Opportunity in the first open stage on {p.accountName}, linked to this pointer.</div>
+                        <div class="form-row">
+                            <label class="wr-field"><span class="wr-field-label">Amount (EUR)</span><input class="wr-input" type="number" step="1" value={convertAmount} oninput={handleAmount} /></label>
+                            <label class="wr-field"><span class="wr-field-label">Close date</span><input class="wr-input" type="date" value={convertClose} onchange={handleClose} /></label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="wr-btn" onclick={cancelMode}>Cancel</button>
+                            <button type="button" class="wr-btn wr-btn_primary" onclick={confirmConvert} disabled={busy}>Create opportunity</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="body">
+                <div class="wr-card">
+                    <div class="wr-card-title"><lightning-icon icon-name="utility:info" size="x-small"></lightning-icon>Why this pointer <span class="wr-card-sub">{p.rule}</span></div>
+                    <p class="rationale">{p.rationale}</p>
+                    <div class="facts">
+                        <template for:each={facts} for:item="f">
+                            <div key={f.key} class="fact"><div class="wr-kpi-label">{f.label}</div><div class="wr-strong">{f.value}</div></div>
+                        </template>
+                    </div>
+                    <template lwc:if={hasChart}>
+                        <div class="chart">
+                            <c-win-room-line-chart months={chartMonths} series={chartSeries} unit="units" heading="Monthly units"></c-win-room-line-chart>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="wr-card">
+                    <div class="wr-card-title">
+                        <lightning-icon icon-name="utility:einstein" size="x-small"></lightning-icon>AI insight - the why and the what
+                        <button type="button" class="wr-btn push" onclick={generateAi} disabled={aiBusy}><lightning-icon icon-name="utility:magicwand" size="xx-small" class="wr-btn-icon"></lightning-icon>{aiButtonLabel}</button>
+                    </div>
+                    <template lwc:if={aiBusy}><div class="wr-muted">Generating…</div></template>
+                    <template lwc:if={hasAi}>
+                        <p><b>Why: </b>{ai.why}</p>
+                        <p class="wr-mt-xs"><b>What: </b>{ai.what}</p>
+                        <div class="ai-lists">
+                            <template for:each={aiLists} for:item="l">
+                                <div key={l.key}>
+                                    <div class="wr-kpi-label">{l.label}</div>
+                                    <ul class="bullets">
+                                        <template for:each={l.items} for:item="i"><li key={i.key}>{i.text}</li></template>
+                                    </ul>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="wr-muted wr-mt-xs">{aiNote}</div>
+                    </template>
+                    <template lwc:else>
+                        <div class="wr-muted">Generate talking points, discovery questions and next best actions for this pointer.</div>
+                    </template>
+                </div>
+
+                <div class="wr-card">
+                    <div class="wr-card-title"><lightning-icon icon-name="utility:knowledge_base" size="x-small"></lightning-icon>Playbook - best-of-best actions</div>
+                    <ol class="bullets">
+                        <template for:each={playbook} for:item="s"><li key={s.key}>{s.text}</li></template>
+                    </ol>
+                </div>
+
+                <div class="wr-card">
+                    <div class="wr-card-title"><lightning-icon icon-name="utility:task" size="x-small"></lightning-icon>Commitments</div>
+                    <template lwc:if={hasCommitments}>
+                        <table class="wr-table">
+                            <tbody>
+                                <template for:each={commitments} for:item="c">
+                                    <tr key={c.Id}>
+                                        <td>{c.Action__c}<div class="wr-muted">{c.ownerName}</div></td>
+                                        <td class="nowrap">{c.due}</td>
+                                        <td><span class={c.cls}>{c.Status__c}</span></td>
+                                        <td class="wr-num">
+                                            <template lwc:if={c.isOpen}>
+                                                <button type="button" class="wr-icon-btn" title="Mark done" aria-label="Mark done" data-id={c.Id} onclick={markDone}><lightning-icon icon-name="utility:check" size="x-small"></lightning-icon></button>
+                                            </template>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                    <div class="form-row add">
+                        <label class="wr-field grow"><span class="wr-field-label">New action</span><input class="wr-input" type="text" placeholder="e.g. Meet Dr. Weber to review tibia usage" value={newAction} oninput={handleNewAction} /></label>
+                        <label class="wr-field"><span class="wr-field-label">Due</span><input class="wr-input" type="date" value={newDue} onchange={handleNewDue} /></label>
+                        <button type="button" class="wr-btn" onclick={addCommitment} disabled={busy}><lightning-icon icon-name="utility:add" size="xx-small" class="wr-btn-icon"></lightning-icon>Add</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

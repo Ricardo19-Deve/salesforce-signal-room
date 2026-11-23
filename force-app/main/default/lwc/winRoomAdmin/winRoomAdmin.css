@@ -1,0 +1,14 @@
+@import "c/winRoomStyles";
+:host { display: block; }
+.push { margin-left: auto; display: flex; gap: 0.5rem; }
+.msg { margin-bottom: 0.8rem; position: relative; }
+.msg-close { position: absolute; right: 0.6rem; }
+.msg-text { white-space: pre-wrap; max-width: 420px; }
+.edit { margin-top: 1rem; border-left: 4px solid var(--wr-accent); }
+.help { margin-bottom: 0.6rem; }
+.form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.7rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1rem; }
+.section { margin-top: 1rem; }
+.phase { min-width: 140px; }
+.gen-options { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.8rem 0 0.9rem; }
+.gen-actions { margin-top: 0.8rem; }

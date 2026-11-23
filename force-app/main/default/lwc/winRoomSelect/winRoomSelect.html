@@ -1,0 +1,41 @@
+<template>
+    <div class={wrapperClass} onkeydown={handleKey}>
+        <template lwc:if={isField}>
+            <div class="field-label">
+                <template lwc:if={required}><abbr class="req" title="required">*</abbr></template>{label}
+            </div>
+        </template>
+        <button type="button" class={triggerClass} onclick={toggle} disabled={disabled}
+            aria-haspopup="listbox" aria-expanded={open}>
+            <template lwc:if={isField}>
+                <span class="value">{displayValue}</span>
+            </template>
+            <template lwc:else>
+                <template lwc:if={label}><span class="prefix">{label}</span></template>
+                <span class="value">{displayValue}</span>
+            </template>
+            <svg class="chev" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+        <template lwc:if={open}>
+            <div class="menu" role="listbox">
+                <template lwc:if={showSearch}>
+                    <input class="search" type="text" placeholder="Search…" value={term} oninput={handleSearch} />
+                </template>
+                <div class="list">
+                    <template for:each={items} for:item="o">
+                        <div key={o.key} class={o.cls} role="option" aria-selected={o.selected} data-value={o.value} onclick={pick}>
+                            <span class="check">
+                                <template lwc:if={o.selected}>
+                                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 10.5 8.5 14.5 15.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                </template>
+                            </span>
+                            <span class="item-label">{o.label}</span>
+                            <template lwc:if={o.hint}><span class="item-hint">{o.hint}</span></template>
+                        </div>
+                    </template>
+                    <template lwc:if={noResults}><div class="empty">No matches</div></template>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

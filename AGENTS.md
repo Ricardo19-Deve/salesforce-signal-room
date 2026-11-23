@@ -1,0 +1,32 @@
+# Notes for maintainers and AI coding assistants
+
+## Where things are
+
+| Need | File |
+| --- | --- |
+| What a class does | The header comment at the top of every Apex class |
+| Rule semantics and defaults | `docs/rules.md`, `WinRoomRules` |
+| Design decisions, data model | `docs/architecture.md` |
+| Demo data | `WinRoomMockData` (archetypes) and `scripts/apex/seed-demo-data.apex` |
+
+## Rules of this codebase
+
+1. **Pointers come from rules.** `WinRoomEngine` decides whether a pointer exists; `WinRoomAIService` only explains it. Do not let model output create, value or prioritise pointers.
+2. **Every pointer is explainable.** A new rule type must fill `Rationale__c` with the numbers it used and put them in the evidence `facts`; add a chart series when there is a time series.
+3. **Re-runs are safe.** Keep the signature stable (rule | account | product line | surgeon | tender). `save()` must never change the status, owner or decision of an Accepted, Rejected or Converted pointer.
+4. **One pointer per customer × product.** Generic signals (peer white space) lose to specific ones; keep that in the dedupe in `evaluateAccount`.
+5. **User mode.** Controller queries use `AccessLevel.USER_MODE` and DML uses `as user`. Admin-only methods call `requireAdmin()` (custom permission `Win_Room_Admin`). Add new objects and fields to both permission sets.
+6. **No credentials.** The AI service calls `callout:Win_Room_LLM` only. Never add API keys, endpoints with keys or custom settings that hold secrets.
+7. **Neutral UI.** Use `c-win-room-select`, `c-win-room-segmented`, `.wr-btn`, `.wr-input`, `.wr-switch` and the `--wr-*` tokens from `winRoomStyles`. Do not use themed base components (`lightning-button`, `lightning-combobox`, `lightning-input`) or global SLDS utility classes: they pick up the org's brand colour and are not available on LWR sites.
+8. **Charts.** Four series at most, colours in the fixed `SERIES_COLORS` order, always with a legend and the table view.
+9. **Developer Edition storage.** Keep the compact demo mode (18 months, one row per line and month) working; a Developer Edition org has 5 MB of data.
+10. **Tests.** `WinRoomTest` runs as a user with `Win_Room_Admin`. Extend it for new rule types (plant the pattern in `WinRoomMockData.pattern` and assert the pointer type).
+
+## Commands
+
+```bash
+sf project deploy start -o <org> -d force-app -l RunSpecifiedTests -t WinRoomTest
+sf apex run -o <org> -f scripts/apex/seed-demo-data.apex
+npm run lint
+npm test
+```

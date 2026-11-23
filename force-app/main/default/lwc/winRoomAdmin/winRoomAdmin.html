@@ -1,0 +1,180 @@
+<template>
+    <template lwc:if={error}>
+        <div class="wr-alert wr-alert_error" role="alert">{error}</div>
+    </template>
+    <template lwc:if={message}>
+        <div class="wr-alert wr-alert_info msg" role="status">
+            {message}
+            <button type="button" class="wr-icon-btn" title="Dismiss" aria-label="Dismiss" onclick={dismissMessage}><lightning-icon icon-name="utility:close" size="x-small"></lightning-icon></button>
+        </div>
+    </template>
+
+    <div class="wr-tabs" role="tablist">
+        <template for:each={tabs} for:item="t">
+            <button key={t.key} type="button" role="tab" class={t.cls} aria-selected={t.selected} data-tab={t.key} onclick={selectTab}>{t.label}</button>
+        </template>
+    </div>
+        <template lwc:if={tab_rules}>
+            <div class="wr-card">
+                <div class="wr-card-title">
+                    Opportunity identification rules
+                    <span class="wr-card-sub">evaluated by the engine for every in-scope account</span>
+                    <div class="push">
+                        <button type="button" class="wr-btn" onclick={doResetRules}>Reset to defaults</button>
+                        <button type="button" class="wr-btn wr-btn_primary" onclick={doRun} disabled={busy}><lightning-icon icon-name="utility:play" size="xx-small" class="wr-btn-icon"></lightning-icon>Run engine now</button>
+                    </div>
+                </div>
+                <table class="wr-table">
+                    <thead>
+                        <tr>
+                            <th>Active</th><th>Rule</th><th>Type</th><th>Category</th><th class="wr-num">Weight</th>
+                            <th class="wr-num">Threshold</th><th class="wr-num">Min value</th><th class="wr-num">Lookback / recent</th>
+                            <th>Lines</th><th class="wr-num">Ratio</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={ruleRows} for:item="r">
+                            <tr key={r.Id}>
+                                <td><button type="button" class="wr-icon-btn" title="Toggle active" aria-label="Toggle active" data-id={r.Id} onclick={toggleRule}><lightning-icon icon-name={r.activeIcon} size="x-small"></lightning-icon></button></td>
+                                <td><div class="wr-strong">{r.Name}</div><div class="wr-muted">{r.Description__c}</div></td>
+                                <td class="wr-muted" title={r.help}>{r.Rule_Type__c}</td>
+                                <td>{r.Category__c}</td>
+                                <td class="wr-num">{r.Weight__c}</td>
+                                <td class="wr-num">{r.thresholdText}</td>
+                                <td class="wr-num">{r.minText}</td>
+                                <td class="wr-num">{r.lookbackText}</td>
+                                <td class="wr-muted">{r.lines}</td>
+                                <td class="wr-num">{r.Expected_Ratio__c}</td>
+                                <td><button type="button" class="wr-icon-btn" title="Edit" aria-label="Edit" data-id={r.Id} onclick={editRule}><lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon></button></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <template lwc:if={editing}>
+                <div class="wr-card edit">
+                    <div class="wr-card-title">Edit rule - {editing.Code__c}</div>
+                    <div class="wr-muted help">{editHelp}</div>
+                    <div class="wr-grid wr-grid_3">
+                        <label class="wr-field"><span class="wr-field-label">Name</span><input class="wr-input" type="text" value={editing.Name} data-field="Name" oninput={handleRuleField} /></label>
+                        <c-win-room-select variant="field" label="Rule type" value={editing.Rule_Type__c} options={ruleTypeOptions} data-field="Rule_Type__c" onchange={handleRuleField}></c-win-room-select>
+                        <c-win-room-select variant="field" label="Category" value={editing.Category__c} options={categoryOptions} data-field="Category__c" onchange={handleRuleField}></c-win-room-select>
+                        <label class="wr-field"><span class="wr-field-label">Weight (1-5)</span><input class="wr-input" type="number" min="1" max="5" value={editing.Weight__c} data-field="Weight__c" oninput={handleRuleField} /></label>
+                        <label class="wr-field"><span class="wr-field-label">Threshold %</span><input class="wr-input" type="number" step="0.01" value={editing.Threshold_Pct__c} data-field="Threshold_Pct__c" oninput={handleRuleField} /></label>
+                        <label class="wr-field"><span class="wr-field-label">Min value at stake (EUR)</span><input class="wr-input" type="number" value={editing.Min_Value__c} data-field="Min_Value__c" oninput={handleRuleField} /></label>
+                        <label class="wr-field"><span class="wr-field-label">Lookback months</span><input class="wr-input" type="number" value={editing.Lookback_Months__c} data-field="Lookback_Months__c" oninput={handleRuleField} /></label>
+                        <label class="wr-field"><span class="wr-field-label">Recent window months</span><input class="wr-input" type="number" value={editing.Recent_Months__c} data-field="Recent_Months__c" oninput={handleRuleField} /></label>
+                        <label class="wr-field"><span class="wr-field-label">Expected ratio</span><input class="wr-input" type="number" step="0.01" value={editing.Expected_Ratio__c} data-field="Expected_Ratio__c" oninput={handleRuleField} /></label>
+                        <label class="wr-field"><span class="wr-field-label">Anchor product lines (codes)</span><input class="wr-input" type="text" value={editing.Anchor_Lines__c} data-field="Anchor_Lines__c" oninput={handleRuleField} /></label>
+                        <label class="wr-field"><span class="wr-field-label">Target product lines (codes)</span><input class="wr-input" type="text" value={editing.Target_Lines__c} data-field="Target_Lines__c" oninput={handleRuleField} /></label>
+                        <label class="wr-switch"><input type="checkbox" checked={editing.Active__c} data-field="Active__c" onchange={handleRuleField} /><span class="wr-switch-ui"></span><span>Active</span></label>
+                    </div>
+                    <label class="wr-field"><span class="wr-field-label">Description</span><textarea class="wr-input wr-textarea" value={editing.Description__c} data-field="Description__c" oninput={handleRuleField}></textarea></label>
+                    <label class="wr-field"><span class="wr-field-label">Next best action (playbook)</span><textarea class="wr-input wr-textarea" value={editing.Next_Best_Action__c} data-field="Next_Best_Action__c" oninput={handleRuleField}></textarea></label>
+                    <div class="form-actions">
+                        <button type="button" class="wr-btn" onclick={cancelEdit}>Cancel</button>
+                        <button type="button" class="wr-btn wr-btn_primary" onclick={saveEditing} disabled={busy}>Save rule</button>
+                    </div>
+                </div>
+            </template>
+        </template>
+
+        <template lwc:if={tab_runs}>
+            <div class="wr-card">
+                <div class="wr-card-title">
+                    Engine runs
+                    <div class="push"><button type="button" class="wr-btn wr-btn_primary" onclick={doRun} disabled={busy}><lightning-icon icon-name="utility:play" size="xx-small" class="wr-btn-icon"></lightning-icon>Run engine now</button></div>
+                </div>
+                <table class="wr-table">
+                    <thead>
+                        <tr><th>Run</th><th>Status</th><th>Started</th><th class="wr-num">Duration</th><th class="wr-num">Accounts</th><th class="wr-num">New</th><th class="wr-num">Updated</th><th class="wr-num">Expired</th><th>By</th></tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={runRows} for:item="r">
+                            <tr key={r.Id}>
+                                <td class="wr-strong">{r.Name}<div class="wr-muted msg-text">{r.Message__c}</div></td>
+                                <td><span class={r.cls}>{r.Status__c}</span></td>
+                                <td>{r.started}</td>
+                                <td class="wr-num">{r.duration}</td>
+                                <td class="wr-num">{r.Accounts_Processed__c}</td>
+                                <td class="wr-num">{r.Pointers_New__c}</td>
+                                <td class="wr-num">{r.Pointers_Updated__c}</td>
+                                <td class="wr-num">{r.Pointers_Expired__c}</td>
+                                <td class="wr-muted">{r.CreatedBy.Name}</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+
+        <template lwc:if={tab_data}>
+            <div class="stats">
+                <template for:each={statTiles} for:item="s">
+                    <div key={s.key} class="wr-card wr-kpi">
+                        <div class="wr-kpi-label">{s.label}</div>
+                        <div class="wr-kpi-value">{s.value}</div>
+                        <div class="wr-kpi-hint">{s.hint}</div>
+                    </div>
+                </template>
+            </div>
+            <div class="wr-grid wr-grid_2 section">
+                <div class="wr-card">
+                    <div class="wr-card-title">Generate demo data (sandbox)</div>
+                    <p class="wr-muted">Creates profiles on the existing hospital accounts (Account is not modified), surgeons, tenders, win room sessions and 24 months of sales (18 in Developer Edition orgs) with planted churn, switch, cross-sell, surgeon and tender patterns. Safe to re-run.</p>
+                    <div class="gen-options"><label class="wr-check"><input type="checkbox" checked={assignToMe} onchange={handleAssign} /><span class="wr-check-ui"></span><span>Assign all pointers to me (for testing)</span></label>
+                    <label class="wr-check"><input type="checkbox" checked={runAfter} onchange={handleRunAfter} /><span class="wr-check-ui"></span><span>Run the engine when the data is ready</span></label></div>
+                    <button type="button" class="wr-btn wr-btn_primary wr-mt-s" onclick={doGenerate} disabled={busy}><lightning-icon icon-name="utility:database" size="xx-small" class="wr-btn-icon"></lightning-icon>Generate demo data</button>
+                </div>
+                <div class="wr-card">
+                    <div class="wr-card-title">Purge demo data</div>
+                    <p class="wr-muted">Deletes every Win Room record flagged as demo plus engine runs. Opportunities created from pointers are not deleted.</p>
+                    <button type="button" class="wr-btn wr-btn_danger gen-actions" onclick={doPurge} disabled={busy}><lightning-icon icon-name="utility:delete" size="xx-small" class="wr-btn-icon"></lightning-icon>Purge demo data</button>
+                    <div class="wr-muted wr-mt-s">{jobText}</div>
+                </div>
+            </div>
+            <div class="wr-card section">
+                <div class="wr-card-title">Account scope <span class="wr-card-sub">pointers are generated for in-scope accounts; all profiles feed the peer benchmarks</span></div>
+                <table class="wr-table">
+                    <thead><tr><th>Account</th><th>Country</th><th>Segment</th><th>Size</th><th class="wr-num">Knees / hips</th><th>Phase</th><th>In scope</th><th>Rep</th></tr></thead>
+                    <tbody>
+                        <template for:each={profileRows} for:item="p">
+                            <tr key={p.Id}>
+                                <td class="wr-strong">{p.Name}</td>
+                                <td>{p.Country__c}</td>
+                                <td>{p.Segment__c}</td>
+                                <td>{p.Size_Band__c}</td>
+                                <td class="wr-num">{p.Knee_Procedures__c} / {p.Hip_Procedures__c}</td>
+                                <td class="phase"><c-win-room-select value={p.Phase__c} options={phaseOptions} data-id={p.Id} onchange={changePhase}></c-win-room-select></td>
+                                <td><label class="wr-switch"><input type="checkbox" checked={p.In_Scope__c} data-id={p.Id} onchange={toggleScope} /><span class="wr-switch-ui"></span></label></td>
+                                <td class="wr-muted">{p.repName}</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+
+        <template lwc:if={tab_lines}>
+            <div class="wr-card">
+                <div class="wr-card-title">Product lines <span class="wr-card-sub">material-to-system mapping used by the rules (codes are referenced in rule anchor/target lines)</span></div>
+                <table class="wr-table">
+                    <thead><tr><th>Code</th><th>Product line</th><th>System</th><th>Category</th><th>Component</th><th class="wr-num">Avg price</th><th>Capital</th></tr></thead>
+                    <tbody>
+                        <template for:each={lineRows} for:item="l">
+                            <tr key={l.Id}>
+                                <td class="wr-strong">{l.Code__c}</td>
+                                <td>{l.Name}</td>
+                                <td>{l.System__c}</td>
+                                <td>{l.Category__c}</td>
+                                <td>{l.Component__c}</td>
+                                <td class="wr-num">{l.price}</td>
+                                <td>{l.Is_Capital__c}</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+</template>

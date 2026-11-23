@@ -1,0 +1,55 @@
+<template>
+    <div class="wr-card">
+        <div class="wr-toolbar">
+            <label class="wr-search">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                <input type="search" placeholder="Search pointer, account or WR-number" oninput={handleSearch} />
+            </label>
+            <c-win-room-select label="Status" value={status} options={statusOptions} data-field="status" onchange={handleFilter}></c-win-room-select>
+            <c-win-room-select label="Category" value={category} options={categoryOptions} data-field="category" onchange={handleFilter}></c-win-room-select>
+            <c-win-room-select label="Type" value={type} options={typeOptions} data-field="type" onchange={handleFilter}></c-win-room-select>
+            <c-win-room-select label="Priority" value={priority} options={priorityOptions} data-field="priority" onchange={handleFilter}></c-win-room-select>
+            <span class="spacer"></span>
+            <c-win-room-select label="Sort" value={sortBy} options={sortOptions} data-field="sortBy" onchange={handleFilter}></c-win-room-select>
+        </div>
+        <template lwc:if={error}>
+            <div class="wr-alert wr-alert_error" role="alert">{error}</div>
+        </template>
+        <div class="summary"><span class="wr-section-label">{summary}</span></div>
+        <div class="list">
+            <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+            <template lwc:if={hasRows}>
+                <table class="wr-table">
+                    <thead>
+                        <tr>
+                            <th>Priority</th><th>#</th><th>Pointer</th><th>Account</th><th>Type</th>
+                            <th class="wr-num">Value / yr</th><th>Score</th><th>Due</th><th>Status</th><th>Owner</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={rows} for:item="p">
+                            <tr key={p.id} class="wr-click" data-id={p.id} onclick={openPointer}>
+                                <td><span class={p.priorityClass}>{p.priority}</span></td>
+                                <td class="wr-faint nowrap">{p.name}</td>
+                                <td>
+                                    <div class="wr-strong">{p.title}</div>
+                                    <div class="wr-faint">{p.rule}</div>
+                                </td>
+                                <td><span class="wr-link" data-id={p.accountId} onclick={openAccount}>{p.accountName}</span><div class="wr-muted">{p.country}</div></td>
+                                <td class="wr-muted nowrap">{p.type}</td>
+                                <td class="wr-num wr-strong">{p.valueText}</td>
+                                <td class="nowrap"><span class="wr-score"><span class="wr-score-fill" style={p.scoreStyle}></span></span>{p.score}</td>
+                                <td class={p.dueCellClass}>{p.dueText}</td>
+                                <td class="nowrap"><span class={p.statusClass}>{p.status}</span><div class="wr-faint">{p.opportunityStage}</div></td>
+                                <td class="wr-muted nowrap">{p.assignedTo}</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+            <template lwc:else>
+                <div class="wr-empty">No pointers match these filters.</div>
+            </template>
+        </div>
+    </div>
+</template>

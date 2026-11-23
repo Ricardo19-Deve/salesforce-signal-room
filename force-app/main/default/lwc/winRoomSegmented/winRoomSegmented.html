@@ -1,0 +1,7 @@
+<template>
+    <div class="group" role="group" aria-label={label}>
+        <template for:each={items} for:item="o">
+            <button key={o.value} type="button" class={o.cls} data-value={o.value} aria-pressed={o.pressed} onclick={pick}>{o.label}</button>
+        </template>
+    </div>
+</template>

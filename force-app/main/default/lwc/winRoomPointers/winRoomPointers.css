@@ -1,0 +1,7 @@
+@import "c/winRoomStyles";
+:host { display: block; }
+.wr-search { flex: 1; max-width: 380px; }
+.spacer { flex: 1; }
+.summary { margin-bottom: 0.5rem; }
+.list { position: relative; min-height: 120px; overflow-x: auto; }
+.nowrap { white-space: nowrap; }
