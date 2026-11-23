@@ -286,7 +286,7 @@ public with sharing class WinRoomMarket {
     }
 
     @TestVisible
-    static Decimal dice(Set<String> a, Set<String> b) {
+    public static Decimal dice(Set<String> a, Set<String> b) {
         if (a.isEmpty() || b.isEmpty()) {
             return 0;
         }

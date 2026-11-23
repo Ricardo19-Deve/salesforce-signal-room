@@ -139,7 +139,11 @@
                                 <tbody>
                                     <template for:each={tenders} for:item="t">
                                         <tr key={t.Id}>
-                                            <td>{t.Name}<div class="wr-muted">{t.Reference__c} · {t.Source__c}</div></td>
+                                            <td>
+                                                <template lwc:if={t.URL__c}><a href={t.URL__c} target="_blank" rel="noopener noreferrer" class="wr-link">{t.Name}</a></template>
+                                                <template lwc:else>{t.Name}</template>
+                                                <div class="wr-muted">{t.Reference__c} · {t.Source__c}</div>
+                                            </td>
                                             <td class="nowrap">{t.deadline}<div class="wr-overdue">{t.left}</div></td>
                                             <td class="wr-num">{t.value}</td>
                                             <td>{t.Status__c}</td>

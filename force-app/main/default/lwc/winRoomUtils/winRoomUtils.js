@@ -9,6 +9,15 @@ export const CATEGORY_META = {
     "New accounts & tenders": { icon: "utility:new_window", hint: "Tender radar, greenfield, share of wallet" }
 };
 
+/** Country names for ISO codes used by accounts and public tenders. */
+export const COUNTRY_NAMES = {
+    AT: "Austria", BE: "Belgium", BG: "Bulgaria", CH: "Switzerland", CY: "Cyprus", CZ: "Czechia", DE: "Germany",
+    DK: "Denmark", EE: "Estonia", ES: "Spain", FI: "Finland", FR: "France", GB: "United Kingdom", GR: "Greece",
+    HR: "Croatia", HU: "Hungary", IE: "Ireland", IS: "Iceland", IT: "Italy", LI: "Liechtenstein", LT: "Lithuania",
+    LU: "Luxembourg", LV: "Latvia", MT: "Malta", NL: "Netherlands", NO: "Norway", PL: "Poland", PT: "Portugal",
+    RO: "Romania", SE: "Sweden", SI: "Slovenia", SK: "Slovakia"
+};
+
 /** Categorical series colours (validated palette, fixed order - never cycled). */
 export const SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"];
 

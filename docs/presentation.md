@@ -12,7 +12,7 @@
 1. **Identify.** 15 configurable rules compare each hospital with its own history and with similar hospitals, and create *pointers*: churn, partial switches, missing components, robotic workflows, surgeons, tenders, low share of wallet.
 2. **Activate.** Each pointer shows *why*: the numbers, a chart and the rule. An optional AI summary adds talking points and questions. The rep accepts it (and creates an Opportunity) or rejects it with a reason.
 3. **Execute.** A weekly win room asks the same 7 questions every 7 days, and commitments have owners and due dates.
-4. **Control.** Contracts show committed vs delivered volume month by month; shortfalls, overruns and renewals become pointers. A market view brings public registry volumes per hospital, so share of wallet uses real procedure counts.
+4. **Control.** Contracts show committed vs delivered volume month by month; shortfalls, overruns and renewals become pointers. A market view brings public registry volumes per hospital, so share of wallet uses real procedure counts, and the tender radar reads real public tenders from the EU and UK portals.
 
 ## Why it is built this way (1 minute)
 
@@ -29,5 +29,7 @@ Follow the 10-minute script in the [README](../README.md#demo-script-10-minutes)
 - *Where does the data come from?* Monthly sell-in from the ERP at account × product line level, plus optional surgeon affiliations and tenders. The demo generates fictitious data with planted patterns.
 - *Does it need AI?* No. Without the Named Credential every screen works with rule-based summaries.
 - *How does it scale?* Two batches (benchmarks, then evaluation, 5 accounts per execute); the queries are aggregated by month.
-- *Is the market data real?* Yes, and public: the UK National Joint Registry export, downloaded by the user and parsed in the browser. Everything else in the demo is fictitious.
+- *Is the market data real?* Yes, and public: the UK National Joint Registry export, downloaded by the user and parsed in the browser.
+- *Are the tenders real?* Yes: TED, Find a Tender and Public Contracts Scotland notices, read through their public APIs, filtered by CPV code and linked to accounts by buyer name. Sales, surgeons and contracts in the demo are fictitious.
+- *How is a number calculated?* Open the **Guide** (or *How this page works* on any page): it has every formula and the live rule settings.
 - *What if a pointer is wrong?* Reject it with a reason. The rule's acceptance rate on the dashboard shows when to tune it.

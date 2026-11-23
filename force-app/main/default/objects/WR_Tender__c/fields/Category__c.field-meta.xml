@@ -29,6 +29,16 @@
                 <default>false</default>
                 <label>Robotics</label>
             </value>
+            <value>
+                <fullName>Trauma</fullName>
+                <default>false</default>
+                <label>Trauma</label>
+            </value>
+            <value>
+                <fullName>Orthopaedics</fullName>
+                <default>false</default>
+                <label>Orthopaedics</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

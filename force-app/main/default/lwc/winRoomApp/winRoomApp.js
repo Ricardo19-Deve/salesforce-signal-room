@@ -8,9 +8,11 @@ const VIEWS = [
     { view: "account", label: "Account 360", icon: "utility:company", subtitle: "One hospital: trend, product lines, surgeons, tenders and pointers" },
     { view: "winroom", label: "Win Room", icon: "utility:groups", subtitle: "Same 7 questions every 7 days" },
     { view: "contracts", label: "Contracts", icon: "utility:contract", subtitle: "Committed volumes vs delivered, month by month" },
-    { view: "market", label: "Market", icon: "utility:world", subtitle: "Hospital procedure volumes from the national joint registry" }
+    { view: "market", label: "Market", icon: "utility:world", subtitle: "Hospital procedure volumes from the national joint registry" },
+    { view: "tenders", label: "Tenders", icon: "utility:announcement", subtitle: "Public tenders from TED, Find a Tender and Public Contracts Scotland, matched to accounts" }
 ];
 const ADMIN_VIEWS = [{ view: "admin", label: "Rules & Data", icon: "utility:settings", subtitle: "Rules, engine runs, demo data and account scope" }];
+const GUIDE_VIEW = { view: "guide", label: "Guide", icon: "utility:help", subtitle: "Every page explained: where the data comes from, how it is calculated, and a demo script" };
 const SCOPE_KEY = "winRoom.scope";
 const COUNTRY_KEY = "winRoom.country";
 
@@ -30,6 +32,7 @@ export default class WinRoomApp extends LightningElement {
     country = "";
     selectedPointerId;
     selectedAccountId;
+    guideSection = "overview";
     refreshKey = 0;
 
     connectedCallback() {
@@ -79,6 +82,18 @@ export default class WinRoomApp extends LightningElement {
     get isAdminView() {
         return this.view === "admin";
     }
+    get isTenders() {
+        return this.view === "tenders";
+    }
+    get showPageGuide() {
+        return this.view !== "guide";
+    }
+    get isGuide() {
+        return this.view === "guide";
+    }
+    get guideBtnClass() {
+        return this.view === "guide" ? "guide-btn guide-btn_active" : "guide-btn";
+    }
     get isAdmin() {
         return this.ctx && this.ctx.isAdmin;
     }
@@ -95,7 +110,7 @@ export default class WinRoomApp extends LightningElement {
         return [{ label: "All countries", value: "" }, ...list.map((c) => ({ label: names[c] || c, value: c, hint: c }))];
     }
     get current() {
-        return [...VIEWS, ...ADMIN_VIEWS].find((v) => v.view === this.view) || VIEWS[0];
+        return [...VIEWS, ...ADMIN_VIEWS, GUIDE_VIEW].find((v) => v.view === this.view) || VIEWS[0];
     }
     get showFilters() {
         return this.view === "dashboard" || this.view === "pointers";
@@ -168,5 +183,16 @@ export default class WinRoomApp extends LightningElement {
     }
     goAdmin() {
         this.view = "admin";
+    }
+    openGuide() {
+        this.guideSection = "overview";
+        this.view = "guide";
+    }
+    openPageGuide() {
+        this.guideSection = this.view;
+        this.view = "guide";
+    }
+    handleGuideNavigate(event) {
+        this.view = event.detail.view;
     }
 }

@@ -439,4 +439,162 @@ private class WinRoomTest {
         Assert.areEqual(1, WinRoomMarket.dice(a, b));
         Assert.areEqual(0, WinRoomMarket.dice(a, new Set<String>()));
     }
+
+    // ------------------------------------------------------------------ public tender feeds
+
+    private class TenderFeedMock implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest req) {
+            HttpResponse res = new HttpResponse();
+            res.setStatusCode(200);
+            String in40 = String.valueOf(Date.today().addDays(40));
+            Map<String, Object> theatre = new Map<String, Object>{ 'id' => '45000000', 'scheme' => 'CPV' };
+            Map<String, Object> fixation = new Map<String, Object>{ 'id' => '33141770', 'scheme' => 'CPV' };
+            if (req.getEndpoint().contains('ted.europa.eu')) {
+                res.setBody(JSON.serialize(new Map<String, Object>{
+                    'totalNoticeCount' => 1,
+                    'notices' => new List<Object>{ new Map<String, Object>{
+                        'publication-number' => '123456-2026',
+                        'notice-title' => new Map<String, Object>{ 'eng' => 'Germany – Orthopaedic implants – Knieendoprothesen und Hüftendoprothesen' },
+                        'buyer-name' => new Map<String, Object>{ 'deu' => new List<Object>{ 'Test Hospital Charlie' } },
+                        'buyer-country' => new List<Object>{ 'DEU' },
+                        'publication-date' => String.valueOf(Date.today()) + '+01:00',
+                        'deadline-receipt-tender-date-lot' => new List<Object>{ in40 + '+01:00', in40 + '+01:00' },
+                        'classification-cpv' => new List<Object>{ '33183100', '33183100' },
+                        'estimated-value-lot' => new List<Object>{ '100000.00', '50000.00' },
+                        'estimated-value-cur-lot' => new List<Object>{ 'EUR' },
+                        'notice-type' => 'cn-standard'
+                    } }
+                }));
+            } else {
+                String scottish = 'Trauma fixation devices';
+                List<Object> releases = new List<Object>{
+                    release('rls-1-NOV100', 'Alpha Test Hospital NHS Trust', scottish, fixation, in40, 1000),
+                    release('rls-1-NOV101', 'Alpha Test Hospital NHS Trust', 'Office furniture', theatre, in40, 5000)
+                };
+                if (req.getEndpoint().contains('publiccontractsscotland')) {
+                    // The same notice as on Find a Tender (skipped as a duplicate) and one only on PCS.
+                    releases.add(release('rls-2-NOV200', 'Northern Isles Board', 'Hip arthroplasty implants', fixation, in40, 2000));
+                }
+                res.setBody(JSON.serialize(new Map<String, Object>{ 'releases' => releases }));
+            }
+            return res;
+        }
+
+        private Map<String, Object> release(String id, String buyer, String title, Map<String, Object> cpv, String deadline,
+                Decimal amount) {
+            return new Map<String, Object>{
+                'id' => id, 'ocid' => 'ocds-' + id, 'date' => String.valueOf(Date.today()) + 'T09:00:00Z',
+                'tag' => new List<Object>{ 'tender' },
+                'buyer' => new Map<String, Object>{ 'name' => buyer },
+                'tender' => new Map<String, Object>{
+                    'title' => title, 'status' => 'active', 'description' => 'Supply of ' + title,
+                    'classification' => cpv,
+                    'value' => new Map<String, Object>{ 'amount' => amount, 'currency' => 'GBP' },
+                    'tenderPeriod' => new Map<String, Object>{ 'endDate' => deadline + 'T12:00:00Z' }
+                }
+            };
+        }
+    }
+
+    @IsTest
+    static void tenderFeedsImportDeduplicateAndMatch() {
+        System.runAs(wrUser()) {
+            List<WR_Tender_Source__c> sources = WinRoomTenders.sources();
+            for (WR_Tender_Source__c s : sources) {
+                s.Active__c = true;
+                s.Lookback_Days__c = 30;
+            }
+            update sources;
+            Test.setMock(HttpCalloutMock.class, new TenderFeedMock());
+            Test.startTest();
+            Database.executeBatch(new WinRoomTenderSync(), 10);
+            Test.stopTest();
+
+            Map<String, WR_Tender__c> byRef = new Map<String, WR_Tender__c>();
+            for (WR_Tender__c t : [
+                SELECT Reference__c, Category__c, Country__c, Estimated_Value__c, Original_Value__c, Status__c,
+                       Account__r.Name, Match_Status__c, Source__c, URL__c
+                FROM WR_Tender__c
+            ]) {
+                byRef.put(t.Reference__c, t);
+            }
+            Assert.areEqual(new Set<String>{ 'TED-123456-2026', 'FTS-rls-1-NOV100', 'PCS-NOV200' }, byRef.keySet(),
+                'out-of-scope CPV filtered and the Scottish duplicate skipped');
+            WR_Tender__c ted = byRef.get('TED-123456-2026');
+            Assert.areEqual('Knee & Hip', ted.Category__c);
+            Assert.areEqual('DE', ted.Country__c);
+            Assert.areEqual(150000, ted.Estimated_Value__c, 'lots are summed');
+            Assert.areEqual('Test Hospital Charlie', ted.Account__r.Name);
+            Assert.areEqual('Auto-matched', ted.Match_Status__c);
+            WR_Tender__c fts = byRef.get('FTS-rls-1-NOV100');
+            Assert.areEqual('Trauma', fts.Category__c);
+            Assert.isTrue(fts.Estimated_Value__c > fts.Original_Value__c, 'GBP converted to EUR');
+            Assert.areEqual('Test Hospital Alpha', fts.Account__r.Name);
+            Assert.areEqual('Unmatched', byRef.get('PCS-NOV200').Match_Status__c);
+            Assert.areEqual('Hip', byRef.get('PCS-NOV200').Category__c);
+            for (WR_Tender_Source__c s : [SELECT Last_Status__c, Last_Run__c FROM WR_Tender_Source__c]) {
+                Assert.isTrue(s.Last_Status__c.startsWith('OK'), s.Last_Status__c);
+            }
+
+            Map<String, Object> view = WinRoomController.getTenders(null);
+            Assert.areEqual(3, ((List<Object>) view.get('rows')).size());
+            Assert.areEqual(2, view.get('linked'));
+            Map<String, Object> filtered = WinRoomController.getTenders(JSON.serialize(new Map<String, Object>{
+                'mapping' => 'Unmatched', 'source' => 'Public Contracts Scotland', 'status' => 'All', 'search' => 'Hip'
+            }));
+            Assert.areEqual(1, ((List<Object>) filtered.get('rows')).size());
+
+            // Human decisions survive a re-sync.
+            Id pcsId = [SELECT Id FROM WR_Tender__c WHERE Reference__c = 'PCS-NOV200'].Id;
+            Id bravo = [SELECT Id FROM Account WHERE Name = 'Test Hospital Bravo'].Id;
+            WinRoomController.setTenderMapping(pcsId, bravo, 'Confirmed');
+            WinRoomController.setTenderStatus(ted.Id, 'Submitted');
+            WinRoomTenders.Notice again = new WinRoomTenders.Notice();
+            again.ref = 'TED-123456-2026';
+            again.source = WinRoomTenders.TED;
+            again.title = 'Knieendoprothesen und Hüftendoprothesen';
+            again.buyer = 'Test Hospital Charlie';
+            again.country = 'DE';
+            again.status = 'Open';
+            again.deadline = Date.today().addDays(40);
+            Assert.areEqual(1, WinRoomTenders.store(new List<WinRoomTenders.Notice>{ again }));
+            Assert.areEqual('Submitted', [SELECT Status__c FROM WR_Tender__c WHERE Id = :ted.Id].Status__c);
+            Assert.areEqual(bravo, [SELECT Account__c FROM WR_Tender__c WHERE Id = :pcsId].Account__c);
+            Assert.areEqual(0, WinRoomController.autoMatchTenders().get('auto'));
+            WinRoomController.setTenderMapping(pcsId, null, 'Ignored');
+            Assert.areEqual('Ignored', [SELECT Match_Status__c FROM WR_Tender__c WHERE Id = :pcsId].Match_Status__c);
+        }
+    }
+
+    @IsTest
+    static void tenderSourcesScheduleAndHelpers() {
+        System.runAs(wrUser()) {
+            List<WR_Tender_Source__c> sources = WinRoomTenders.sources();
+            Assert.areEqual(3, sources.size());
+            WR_Tender_Source__c ted;
+            for (WR_Tender_Source__c s : sources) {
+                if (s.Code__c == WinRoomTenders.TED) {
+                    ted = s;
+                }
+            }
+            ted.Countries__c = 'DE, FR';
+            ted.CPV_Prefixes__c = '33183';
+            WinRoomController.saveTenderSource(ted);
+            ted = [SELECT Id, Code__c, CPV_Prefixes__c, Countries__c, Lookback_Days__c, Last_Run__c FROM WR_Tender_Source__c WHERE Id = :ted.Id];
+            String body = WinRoomTenders.tedRequest(ted, Date.newInstance(2026, 11, 1), 1).getBody();
+            Assert.isTrue(body.contains('33183*') && body.contains('buyer-country IN (DEU FRA)') && body.contains('20261101'), body);
+            Assert.areEqual(Date.today().addDays(-30), WinRoomTenders.fromDate(ted));
+
+            WinRoomController.scheduleTenderSync(true);
+            Assert.isTrue(WinRoomTenderSync.isScheduled());
+            WinRoomController.scheduleTenderSync(false);
+            Assert.isFalse(WinRoomTenderSync.isScheduled());
+
+            Assert.areEqual('Robotics', WinRoomTenders.category('33183100', 'Robotic-assisted knee system'));
+            Assert.areEqual('Orthopaedics', WinRoomTenders.category('33183100', 'Implants'));
+            Assert.areEqual(new Set<String>{ 'lodz', 'jonschera' },
+                WinRoomTenders.tokens('Szpital Łódź im. Jonschera'));
+            Assert.areEqual(WinRoomTenders.dedupeKey('A Board', 'Hip implants'), WinRoomTenders.dedupeKey('A Board', 'Hip  implants!'));
+        }
+    }
 }

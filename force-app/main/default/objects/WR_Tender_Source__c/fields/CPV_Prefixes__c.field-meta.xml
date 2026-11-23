@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>CPV_Prefixes__c</fullName>
+    <description>Comma-separated CPV code prefixes, e.g. 33183, 33184, 33141770.</description>
+    <label>CPV Prefixes</label>
+    <length>255</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

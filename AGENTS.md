@@ -8,6 +8,8 @@
 | Rule semantics and defaults | `docs/rules.md`, `WinRoomRules` |
 | Design decisions, data model | `docs/architecture.md` |
 | Demo data | `WinRoomMockData` (archetypes) and `scripts/apex/seed-demo-data.apex` |
+| Public tender feeds | `WinRoomTenders` (requests, parsing, store, matching), `WinRoomTenderSync` (batch per source, schedule) |
+| User guide shown in the portal | `lwc/winRoomGuide/guideContent.js` |
 
 ## Rules of this codebase
 
@@ -22,7 +24,9 @@
 9. **Developer Edition storage.** Keep the compact demo mode (18 months, one row per line and month) working; a Developer Edition org has 5 MB of data.
 10. **Real data stays out of the repository.** Demo data is generated and fictitious. The only real data the module uses is the public registry export, which users download themselves; never commit registry files, customer names, contracts or prices from a real organisation.
 11. **Contracts and registry.** Change compliance logic only in `WinRoomContracts` (portal and rules share it). Registry imports must never overwrite account links (`Account__c`, `Match_Status__c`) and must exclude the current, incomplete month.
-12. **Tests.** `WinRoomTest` runs as a user with `Win_Room_Admin`. Extend it for new rule types (plant the pattern in `WinRoomMockData.pattern` and assert the pointer type).
+12. **Tenders.** Read public APIs anonymously and within fair-use limits (paged, one batch item per source or window, all callouts before any DML). A sync must never overwrite `Account__c`, a confirmed / ignored match or a human status (Submitted, Won, Lost). Keep tender data out of the repository like the registry data.
+13. **Guide.** When a calculation, a rule type or a page changes, update `guideContent.js` in the same change: the guide is the user documentation and the demo script.
+14. **Tests.** `WinRoomTest` runs as a user with `Win_Room_Admin`. Extend it for new rule types (plant the pattern in `WinRoomMockData.pattern` and assert the pointer type).
 
 ## Commands
 
