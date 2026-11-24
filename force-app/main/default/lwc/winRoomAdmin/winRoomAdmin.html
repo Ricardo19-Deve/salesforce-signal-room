@@ -21,6 +21,7 @@
                     <span class="wr-card-sub">evaluated by the engine for every in-scope account</span>
                     <div class="push">
                         <button type="button" class="wr-btn" onclick={doResetRules}>Reset to defaults</button>
+                        <button type="button" class="wr-btn" onclick={newRule}><lightning-icon icon-name="utility:add" size="xx-small" class="wr-btn-icon"></lightning-icon>New rule</button>
                         <button type="button" class="wr-btn wr-btn_primary" onclick={doRun} disabled={busy}><lightning-icon icon-name="utility:play" size="xx-small" class="wr-btn-icon"></lightning-icon>Run engine now</button>
                     </div>
                 </div>
@@ -37,7 +38,7 @@
                             <tr key={r.Id}>
                                 <td><button type="button" class="wr-icon-btn" title="Toggle active" aria-label="Toggle active" data-id={r.Id} onclick={toggleRule}><lightning-icon icon-name={r.activeIcon} size="x-small"></lightning-icon></button></td>
                                 <td><div class="wr-strong">{r.Name}</div><div class="wr-muted">{r.Description__c}</div></td>
-                                <td class="wr-muted" title={r.help}>{r.Rule_Type__c}</td>
+                                <td class="wr-muted" title={r.help}>{r.typeLabel}<template lwc:if={r.isCustom}><span class="wr-tag custom-tag">Custom</span></template></td>
                                 <td>{r.Category__c}</td>
                                 <td class="wr-num">{r.Weight__c}</td>
                                 <td class="wr-num">{r.thresholdText}</td>
@@ -53,30 +54,61 @@
             </div>
 
             <template lwc:if={editing}>
-                <div class="wr-card edit">
-                    <div class="wr-card-title">Edit rule - {editing.Code__c}</div>
-                    <div class="wr-muted help">{editHelp}</div>
-                    <div class="wr-grid wr-grid_3">
-                        <label class="wr-field"><span class="wr-field-label">Name</span><input class="wr-input" type="text" value={editing.Name} data-field="Name" oninput={handleRuleField} /></label>
-                        <c-win-room-select variant="field" label="Rule type" value={editing.Rule_Type__c} options={ruleTypeOptions} data-field="Rule_Type__c" onchange={handleRuleField}></c-win-room-select>
-                        <c-win-room-select variant="field" label="Category" value={editing.Category__c} options={categoryOptions} data-field="Category__c" onchange={handleRuleField}></c-win-room-select>
-                        <label class="wr-field"><span class="wr-field-label">Weight (1-5)</span><input class="wr-input" type="number" min="1" max="5" value={editing.Weight__c} data-field="Weight__c" oninput={handleRuleField} /></label>
-                        <label class="wr-field"><span class="wr-field-label">Threshold %</span><input class="wr-input" type="number" step="0.01" value={editing.Threshold_Pct__c} data-field="Threshold_Pct__c" oninput={handleRuleField} /></label>
-                        <label class="wr-field"><span class="wr-field-label">Min value at stake (EUR)</span><input class="wr-input" type="number" value={editing.Min_Value__c} data-field="Min_Value__c" oninput={handleRuleField} /></label>
-                        <label class="wr-field"><span class="wr-field-label">Lookback months</span><input class="wr-input" type="number" value={editing.Lookback_Months__c} data-field="Lookback_Months__c" oninput={handleRuleField} /></label>
-                        <label class="wr-field"><span class="wr-field-label">Recent window months</span><input class="wr-input" type="number" value={editing.Recent_Months__c} data-field="Recent_Months__c" oninput={handleRuleField} /></label>
-                        <label class="wr-field"><span class="wr-field-label">Expected ratio</span><input class="wr-input" type="number" step="0.01" value={editing.Expected_Ratio__c} data-field="Expected_Ratio__c" oninput={handleRuleField} /></label>
-                        <label class="wr-field"><span class="wr-field-label">Anchor product lines (codes)</span><input class="wr-input" type="text" value={editing.Anchor_Lines__c} data-field="Anchor_Lines__c" oninput={handleRuleField} /></label>
-                        <label class="wr-field"><span class="wr-field-label">Target product lines (codes)</span><input class="wr-input" type="text" value={editing.Target_Lines__c} data-field="Target_Lines__c" oninput={handleRuleField} /></label>
+                <div class="modal-backdrop" onclick={cancelEdit}></div>
+                <section class="modal" role="dialog" aria-modal="true" aria-labelledby="rule-modal-title" onkeydown={handleModalKey}>
+                    <header class="modal-head">
+                        <div>
+                            <div class="wr-section-label">{modalEyebrow}</div>
+                            <h2 id="rule-modal-title">{modalTitle}</h2>
+                        </div>
+                        <button type="button" class="wr-icon-btn" title="Close" aria-label="Close" onclick={cancelEdit}><lightning-icon icon-name="utility:close" size="x-small"></lightning-icon></button>
+                    </header>
+                    <div class="modal-body">
+                        <div class="wr-grid wr-grid_2">
+                            <label class="wr-field"><span class="wr-field-label">Name</span><input class="wr-input rule-name" type="text" value={editing.Name} data-field="Name" oninput={handleRuleField} /></label>
+                            <template lwc:if={isNewRule}>
+                                <label class="wr-field"><span class="wr-field-label">Code (unique)</span><input class="wr-input" type="text" value={editing.Code__c} data-field="Code__c" oninput={handleRuleField} /></label>
+                            </template>
+                            <template lwc:else>
+                                <div class="wr-field"><span class="wr-field-label">Code</span><div class="code">{editing.Code__c}</div></div>
+                            </template>
+                            <c-win-room-select variant="field" label="Rule type" value={editing.Rule_Type__c} options={ruleTypeOptions} data-field="Rule_Type__c" onchange={handleRuleField}></c-win-room-select>
+                            <c-win-room-select variant="field" label="Category" value={editing.Category__c} options={categoryOptions} data-field="Category__c" onchange={handleRuleField}></c-win-room-select>
+                        </div>
+                        <div class="type-help"><lightning-icon icon-name="utility:info" size="x-small"></lightning-icon><span>{editHelp}</span></div>
+
+                        <div class="wr-section-label group">Parameters</div>
+                        <div class="wr-grid wr-grid_3">
+                            <label class="wr-field"><span class="wr-field-label">Weight (1-5)</span><input class="wr-input" type="number" min="1" max="5" value={editing.Weight__c} data-field="Weight__c" oninput={handleRuleField} /></label>
+                            <template for:each={paramFields} for:item="f">
+                                <label key={f.field} class="wr-field"><span class="wr-field-label">{f.label}</span><input class="wr-input" type="number" step={f.step} value={f.value} data-field={f.field} oninput={handleRuleField} /></label>
+                            </template>
+                        </div>
+                        <template for:each={lineFields} for:item="f">
+                            <div key={f.field} class="wr-field lines-field">
+                                <span class="wr-field-label">{f.label}</span>
+                                <div class="chips">
+                                    <template for:each={f.chips} for:item="c">
+                                        <button key={c.code} type="button" class={c.cls} aria-pressed={c.pressed} title={c.name} data-field={f.field} data-code={c.code} onclick={toggleLine}>{c.code}</button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="wr-section-label group">Playbook</div>
+                        <label class="wr-field"><span class="wr-field-label">Description (why the pointer exists)</span><textarea class="wr-input wr-textarea" value={editing.Description__c} data-field="Description__c" oninput={handleRuleField}></textarea></label>
+                        <label class="wr-field"><span class="wr-field-label">Next best action</span><textarea class="wr-input wr-textarea" value={editing.Next_Best_Action__c} data-field="Next_Best_Action__c" oninput={handleRuleField}></textarea></label>
+                    </div>
+                    <footer class="modal-foot">
                         <label class="wr-switch"><input type="checkbox" checked={editing.Active__c} data-field="Active__c" onchange={handleRuleField} /><span class="wr-switch-ui"></span><span>Active</span></label>
-                    </div>
-                    <label class="wr-field"><span class="wr-field-label">Description</span><textarea class="wr-input wr-textarea" value={editing.Description__c} data-field="Description__c" oninput={handleRuleField}></textarea></label>
-                    <label class="wr-field"><span class="wr-field-label">Next best action (playbook)</span><textarea class="wr-input wr-textarea" value={editing.Next_Best_Action__c} data-field="Next_Best_Action__c" oninput={handleRuleField}></textarea></label>
-                    <div class="form-actions">
+                        <template lwc:if={canDelete}>
+                            <button type="button" class="wr-btn wr-btn_danger-text" onclick={deleteEditing} disabled={busy}>Delete rule</button>
+                        </template>
+                        <span class="spacer"></span>
                         <button type="button" class="wr-btn" onclick={cancelEdit}>Cancel</button>
-                        <button type="button" class="wr-btn wr-btn_primary" onclick={saveEditing} disabled={busy}>Save rule</button>
-                    </div>
-                </div>
+                        <button type="button" class="wr-btn wr-btn_primary" onclick={saveEditing} disabled={saveDisabled}>{saveLabel}</button>
+                    </footer>
+                </section>
             </template>
         </template>
 
@@ -119,13 +151,18 @@
                     </div>
                 </template>
             </div>
-            <div class="wr-grid wr-grid_2 section">
+            <div class="wr-grid wr-grid_3 section">
                 <div class="wr-card">
                     <div class="wr-card-title">Generate demo data (sandbox)</div>
                     <p class="wr-muted">Creates profiles on the existing hospital accounts (Account is not modified), surgeons, tenders, win room sessions and 24 months of sales (18 in Developer Edition orgs) with planted churn, switch, cross-sell, surgeon and tender patterns. Safe to re-run.</p>
-                    <div class="gen-options"><label class="wr-check"><input type="checkbox" checked={assignToMe} onchange={handleAssign} /><span class="wr-check-ui"></span><span>Assign all pointers to me (for testing)</span></label>
+                    <div class="gen-options"><label class="wr-check"><input type="checkbox" checked={assignToMe} onchange={handleAssign} /><span class="wr-check-ui"></span><span>Assign the accounts to me and my demo team (otherwise to the account owners)</span></label>
                     <label class="wr-check"><input type="checkbox" checked={runAfter} onchange={handleRunAfter} /><span class="wr-check-ui"></span><span>Run the engine when the data is ready</span></label></div>
                     <button type="button" class="wr-btn wr-btn_primary wr-mt-s" onclick={doGenerate} disabled={busy}><lightning-icon icon-name="utility:database" size="xx-small" class="wr-btn-icon"></lightning-icon>Generate demo data</button>
+                </div>
+                <div class="wr-card">
+                    <div class="wr-card-title">Demo team</div>
+                    <p class="wr-muted">Creates six fictitious reps (Chatter Free users, no welcome e-mail, no Salesforce licence) whose manager is you. Generate the demo data afterwards to spread the accounts across the team, so the All / Mine / My team filters show different numbers. My team = you and the users whose manager you are.</p>
+                    <button type="button" class="wr-btn gen-actions" onclick={doCreateTeam} disabled={busy}><lightning-icon icon-name="utility:groups" size="xx-small" class="wr-btn-icon"></lightning-icon>Create demo team</button>
                 </div>
                 <div class="wr-card">
                     <div class="wr-card-title">Purge demo data</div>

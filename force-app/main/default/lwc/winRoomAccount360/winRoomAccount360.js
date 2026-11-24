@@ -1,9 +1,15 @@
 import { LightningElement, api } from "lwc";
 import searchAccounts from "@salesforce/apex/WinRoomController.searchAccounts";
 import getAccount360 from "@salesforce/apex/WinRoomController.getAccount360";
-import { CATEGORIES, CATEGORY_META, decoratePointer, money, pct, formatDate, daysUntil, reduceErrors } from "c/winRoomUtils";
+import { CATEGORIES, CATEGORY_META, decoratePointer, money, pct, formatDate, daysUntil, reduceErrors, tourRect } from "c/winRoomUtils";
 
 export default class WinRoomAccount360 extends LightningElement {
+    /** Tour support: scrolls to and measures one block of this page (selector inside the template). */
+    @api
+    tourRect(selector, scroll) {
+        return tourRect(this.template, selector, scroll);
+    }
+
     _accountId;
     _refreshKey;
     accounts = [];

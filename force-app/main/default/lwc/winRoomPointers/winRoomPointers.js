@@ -1,6 +1,6 @@
 import { LightningElement, api } from "lwc";
 import getPointers from "@salesforce/apex/WinRoomController.getPointers";
-import { CATEGORIES, decoratePointer, money, reduceErrors } from "c/winRoomUtils";
+import { CATEGORIES, decoratePointer, money, reduceErrors, tourRect } from "c/winRoomUtils";
 
 const TYPES = [
     "Win-back soft", "Win-back hard", "Partial switch", "Cross-sell", "Peer white space",
@@ -8,6 +8,12 @@ const TYPES = [
 ];
 
 export default class WinRoomPointers extends LightningElement {
+    /** Tour support: scrolls to and measures one block of this page (selector inside the template). */
+    @api
+    tourRect(selector, scroll) {
+        return tourRect(this.template, selector, scroll);
+    }
+
     _scope;
     _country;
     _refreshKey;

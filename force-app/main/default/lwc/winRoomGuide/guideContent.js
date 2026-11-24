@@ -43,7 +43,8 @@ export const SECTIONS = [
                     ]
                 }
             },
-            { note: "Everything in this org except the public tenders and the registry volumes is demo data generated with planted patterns, so each rule has something to find." }
+            { note: "Everything in this org except the public tenders and the registry volumes is demo data generated with planted patterns, so each rule has something to find." },
+            { note: "Every page has a Tour button next to its title: it highlights each block of the page in turn and explains what it is for and where its data comes from. Use it in demos and for onboarding." }
         ]
     },
     {
@@ -53,7 +54,7 @@ export const SECTIONS = [
         blocks: [
             {
                 steps: [
-                    "Dashboard (1 min) - open value at stake, how many pointers wait for review, the share already reviewed by reps and the pipeline created. Point at the rule performance table: it is the feedback loop.",
+                    "Dashboard (1 min) - switch the scope between All, Mine and My team to show that each rep and each manager sees their own work. Then: open value at stake, how many pointers wait for review, the share already reviewed by reps and the pipeline created. Point at the rule performance table: it is the feedback loop.",
                     "Pointers (2 min) - sort by priority, filter a category, open the top pointer. Walk through the facts, the chart and the rationale: every number comes from the sales lines. Generate the AI summary, then accept and create the Opportunity.",
                     "Account 360 (1 min) - from the pointer, open the account: revenue trend, product lines, surgeons, tenders, contracts, market volume and all pointers of the hospital in one view.",
                     "Contracts (2 min) - open a contract that is under-delivering: committed vs delivered per month, cumulative variance, 6-month run-rate and the projection to the end of the term. Show the contract pointer it raised.",
@@ -69,7 +70,7 @@ export const SECTIONS = [
         id: "dashboard",
         view: "dashboard",
         title: "Dashboard",
-        lead: "Where the value is and how the field is acting on it. The Scope (All / Mine) and Country filters at the top apply to this page and to Pointers.",
+        lead: "Where the value is and how the field is acting on it. The Scope and Country filters at the top apply to this page and to Pointers: All = every pointer you can see, Mine = pointers assigned to you, My team = you and the users whose manager you are (the Manager field on the user record).",
         blocks: [
             { h: "Indicators" },
             {
@@ -273,11 +274,12 @@ export const SECTIONS = [
         blocks: [
             {
                 list: [
-                    "Rules: activate, deactivate and tune each rule (threshold %, minimum value, lookback and recent months, expected ratio, weight, description and playbook). Reset rules restores the defaults.",
+                    "Rules: activate, deactivate and tune each rule in a dialog that shows only the parameters its type uses (threshold %, minimum value, lookback and recent months, expected ratio, product lines, weight, description and playbook). New rule adds a rule of any of the 11 types, e.g. a second soft-churn rule with a stricter threshold for one product family. Rules you added can be deleted; default rules can only be deactivated, and Reset rules restores them.",
                     "Engine runs: Run engine starts the two batches (benchmarks, then evaluation per account); the history shows pointers new, updated and expired per run.",
                     "Product lines: codes, categories and average prices used for values and baskets.",
                     "Account scope: which account profiles the engine evaluates and who owns them.",
-                    "Demo data: generate fictitious sales with planted patterns (sandbox only) or purge it. A compact mode keeps the data small in Developer Edition orgs."
+                    "Demo team: creates six fictitious reps (Chatter Free users, no welcome e-mail, no Salesforce licence) whose manager is you, so the Mine and My team filters show different numbers.",
+                    "Demo data: generate fictitious sales with planted patterns (sandbox only), spread across you and your demo team, or purge it. A compact mode keeps the data small in Developer Edition orgs."
                 ]
             }
         ]
@@ -339,7 +341,8 @@ export const SECTIONS = [
                         ["Does it need AI?", "No. Without an AI connection every screen works and summaries are rule-based. AI only writes text from the pointer facts."],
                         ["What if a pointer is wrong?", "Reject it with a reason. The acceptance rate per rule on the dashboard shows when a rule needs tuning, and the admin changes its thresholds without code."],
                         ["How does it scale?", "The engine runs as two batches (benchmarks, then evaluation per account) on monthly aggregates; tender sync and matching run as a batch per source."],
-                        ["Who sees what?", "Salesforce security applies: users see the accounts and pointers they have access to. Admin actions need the Win Room admin permission."]
+                        ["Who sees what?", "Salesforce security applies: users see the accounts and pointers they have access to. Admin actions need the Win Room admin permission. My team follows the Manager field of the users."],
+                        ["Can we add our own rules?", "Yes. Rules & Data > New rule: pick one of the 11 rule types, set its thresholds and playbook, and run the engine. No code or deployment."]
                     ]
                 }
             }

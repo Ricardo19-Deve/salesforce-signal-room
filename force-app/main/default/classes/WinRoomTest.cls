@@ -597,4 +597,50 @@ private class WinRoomTest {
             Assert.areEqual(WinRoomTenders.dedupeKey('A Board', 'Hip implants'), WinRoomTenders.dedupeKey('A Board', 'Hip  implants!'));
         }
     }
+
+    // ------------------------------------------------------------------ demo team, team scope, custom rules
+
+    @IsTest
+    static void demoTeamDrivesTheTeamScope() {
+        User me = wrUser();
+        System.runAs(me) {
+            Assert.areEqual(6, WinRoomController.createDemoTeam());
+            Assert.areEqual(6, WinRoomController.createDemoTeam(), 'idempotent');
+        }
+        System.runAs(me) {
+            seedAndRun();
+            Assert.areEqual(6, WinRoomController.getContext().get('teamSize'));
+            Set<Id> reps = new Set<Id>();
+            for (AggregateResult ar : [SELECT Rep__c r FROM WR_Account_Profile__c GROUP BY Rep__c]) {
+                reps.add((Id) ar.get('r'));
+            }
+            Assert.isTrue(reps.size() > 1, 'accounts are spread across the team');
+            Integer all = WinRoomController.getPointers(JSON.serialize(new Map<String, Object>{ 'scope' => 'all' })).size();
+            Integer mine = WinRoomController.getPointers(JSON.serialize(new Map<String, Object>{ 'scope' => 'mine' })).size();
+            Integer team = WinRoomController.getPointers(JSON.serialize(new Map<String, Object>{ 'scope' => 'team' })).size();
+            Assert.isTrue(mine < team, 'my team includes my reports');
+            Assert.areEqual(all, team, 'every demo pointer belongs to the team');
+            Assert.isNotNull(WinRoomController.getDashboard('team', null));
+        }
+    }
+
+    @IsTest
+    static void customRulesCanBeAddedAndDeleted() {
+        System.runAs(wrUser()) {
+            WinRoomRules.ensureDefaults(true);
+            WR_Rule__c r = WinRoomController.saveRule(new WR_Rule__c(
+                Name = 'Deep churn', Code__c = 'CUSTOM_DEEP_CHURN', Rule_Type__c = 'WINBACK_SOFT', Category__c = 'Win back',
+                Active__c = true, Weight__c = 3, Threshold_Pct__c = 50, Min_Value__c = 1000, Lookback_Months__c = 12, Recent_Months__c = 3
+            ));
+            WinRoomController.deleteRule(r.Id);
+            Assert.areEqual(0, [SELECT COUNT() FROM WR_Rule__c WHERE Code__c = 'CUSTOM_DEEP_CHURN']);
+            Id defaultRule = [SELECT Id FROM WR_Rule__c WHERE Code__c = 'NT_TENDER'].Id;
+            try {
+                WinRoomController.deleteRule(defaultRule);
+                Assert.fail('default rules cannot be deleted');
+            } catch (AuraHandledException e) {
+                Assert.areEqual(1, [SELECT COUNT() FROM WR_Rule__c WHERE Id = :defaultRule]);
+            }
+        }
+    }
 }

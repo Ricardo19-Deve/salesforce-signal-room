@@ -36,7 +36,7 @@
                     </div>
                 </div>
 
-                <div class="wr-card">
+                <div class="wr-card" data-tour="pointers">
                     <div class="wr-card-title">Improvement pointers - 360° view</div>
                     <div class="wr-grid wr-grid_2">
                         <template for:each={quadrants} for:item="q">
@@ -91,13 +91,13 @@
                     <template lwc:else><div class="wr-faint">No volume contracts for this account.</div></template>
                 </div>
 
-                <div class="wr-card">
+                <div class="wr-card" data-tour="trend">
                     <div class="wr-card-title">Revenue trend by category <span class="wr-card-sub">monthly</span></div>
                     <c-win-room-line-chart months={data.months} series={data.series} unit="money" wide heading="Monthly revenue by category"></c-win-room-line-chart>
                 </div>
 
                 <div class="wr-grid wr-grid_2 row">
-                    <div class="wr-card">
+                    <div class="wr-card" data-tour="lines">
                         <div class="wr-card-title">Product lines <span class="wr-card-sub">growth = last 6 months vs the same months a year earlier</span></div>
                         <table class="wr-table">
                             <thead><tr><th>Line</th><th class="wr-num">Units 12m</th><th class="wr-num">Revenue 12m</th><th class="wr-num">Growth</th></tr></thead>
@@ -132,7 +132,7 @@
                 </div>
 
                 <div class="wr-grid wr-grid_2 row">
-                    <div class="wr-card">
+                    <div class="wr-card" data-tour="tenders">
                         <div class="wr-card-title">Tenders</div>
                         <template lwc:if={hasTenders}>
                             <table class="wr-table">

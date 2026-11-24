@@ -8,7 +8,7 @@ import setTenderMapping from "@salesforce/apex/WinRoomController.setTenderMappin
 import setTenderStatus from "@salesforce/apex/WinRoomController.setTenderStatus";
 import searchAllAccounts from "@salesforce/apex/WinRoomController.searchAllAccounts";
 import getJobStatus from "@salesforce/apex/WinRoomController.getJobStatus";
-import { money, formatDate, reduceErrors, COUNTRY_NAMES } from "c/winRoomUtils";
+import { money, formatDate, reduceErrors, COUNTRY_NAMES, tourRect } from "c/winRoomUtils";
 
 const POLL_MS = 4000;
 const COVERAGE = {
@@ -24,6 +24,12 @@ const CATEGORIES = ["Knee", "Hip", "Knee & Hip", "Robotics", "Trauma", "Orthopae
  * Admins manage the sources, run the sync and confirm buyer-to-account links.
  */
 export default class WinRoomTenders extends LightningElement {
+    /** Tour support: scrolls to and measures one block of this page (selector inside the template). */
+    @api
+    tourRect(selector, scroll) {
+        return tourRect(this.template, selector, scroll);
+    }
+
     @api isAdmin = false;
 
     data;

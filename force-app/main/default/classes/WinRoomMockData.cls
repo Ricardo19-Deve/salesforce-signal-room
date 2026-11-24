@@ -32,6 +32,72 @@ public with sharing class WinRoomMockData {
     // ------------------------------------------------------------------ entry points
 
     /** Seeds rules, profiles, surgeons, tenders and sessions, then starts the sales batch. */
+    public static final String DEMO_TEAM_DEPARTMENT = 'Win Room demo team';
+    private static final List<String[]> DEMO_TEAM = new List<String[]>{
+        new String[]{ 'Anna', 'Weber' }, new String[]{ 'James', 'Carter' }, new String[]{ 'Lucas', 'Martin' },
+        new String[]{ 'Sofia', 'Ricci' }, new String[]{ 'Elena', 'Navarro' }, new String[]{ 'Daniel', 'Costa' }
+    };
+
+    /**
+     * Creates (or re-activates) six fictitious reps reporting to the current user, with a Chatter Free licence and
+     * no welcome e-mail. They only own demo pointers so the All / Mine / My team filters can be shown.
+     * Runs in its own transaction: users are setup objects and cannot be inserted with the demo records.
+     */
+    public static Integer createDemoTeam() {
+        List<Profile> chatterFree = [SELECT Id FROM Profile WHERE UserLicense.Name = 'Chatter Free' LIMIT 1];
+        if (chatterFree.isEmpty()) {
+            throw new IllegalArgumentException('No Chatter Free profile in this org.');
+        }
+        String org = UserInfo.getOrganizationId().left(15).toLowerCase();
+        Map<String, User> existing = new Map<String, User>();
+        for (User u : [SELECT Id, Username, IsActive, ManagerId FROM User WHERE Department = :DEMO_TEAM_DEPARTMENT]) {
+            existing.put(u.Username, u);
+        }
+        List<User> upserts = new List<User>();
+        Integer i = 0;
+        for (String[] n : DEMO_TEAM) {
+            i++;
+            String key = (n[0] + '.' + n[1]).toLowerCase();
+            String username = 'wr.demo.' + key + '.' + org + '@example.com';
+            User u = existing.get(username);
+            if (u != null) {
+                upserts.add(new User(Id = u.Id, IsActive = true, ManagerId = UserInfo.getUserId()));
+                continue;
+            }
+            upserts.add(new User(
+                FirstName = n[0], LastName = n[1], Username = username, Email = 'wr.demo.' + key + '@example.com',
+                Alias = ('wrd' + n[0]).left(8), CommunityNickname = ('wrdemo.' + key + '.' + org).left(40),
+                ProfileId = chatterFree[0].Id, ManagerId = UserInfo.getUserId(), Department = DEMO_TEAM_DEPARTMENT,
+                Title = 'Sales Rep (demo)', TimeZoneSidKey = UserInfo.getTimeZone().getID(), LocaleSidKey = 'en_GB',
+                EmailEncodingKey = 'UTF-8', LanguageLocaleKey = 'en_US'
+            ));
+        }
+        Database.DMLOptions noMail = new Database.DMLOptions();
+        noMail.EmailHeader.triggerUserEmail = false;
+        noMail.EmailHeader.triggerAutoResponseEmail = false;
+        noMail.EmailHeader.triggerOtherEmail = false;
+        List<User> inserts = new List<User>();
+        List<User> updates = new List<User>();
+        for (User u : upserts) {
+            (u.Id == null ? inserts : updates).add(u);
+        }
+        Database.insert(inserts, noMail);
+        Database.update(updates, noMail);
+        return upserts.size();
+    }
+
+    /** Reps for the demo accounts: the current user and, when it exists, the demo team. */
+    private static List<Id> demoReps() {
+        List<Id> reps = new List<Id>{ UserInfo.getUserId() };
+        for (User u : [
+            SELECT Id FROM User WHERE ManagerId = :UserInfo.getUserId() AND Department = :DEMO_TEAM_DEPARTMENT
+            AND IsActive = true ORDER BY LastName
+        ]) {
+            reps.add(u.Id);
+        }
+        return reps;
+    }
+
     public static Id generate(Boolean assignToMe, Boolean runEngine) {
         return generate(assignToMe, runEngine, isDeveloperEdition());
     }
@@ -118,6 +184,7 @@ public with sharing class WinRoomMockData {
 
     private static List<WR_Account_Profile__c> buildProfiles(List<Account> accounts, Boolean assignToMe,
             Map<Id, Integer> archetypes) {
+        List<Id> reps = assignToMe ? demoReps() : new List<Id>();
         // Phase 1 countries first so the planted patterns are spread across GB, DE and FR.
         List<Account> ordered = new List<Account>();
         for (String c : PHASE_ORDER) {
@@ -161,7 +228,9 @@ public with sharing class WinRoomMockData {
                 Phase__c = phase,
                 In_Scope__c = phase == 'Phase 1',
                 Has_Robot__c = archetype == 5 || (archetype != 6 && rng.next() < 0.3),
-                Rep__c = assignToMe ? UserInfo.getUserId() : a.OwnerId,
+                // With a demo team, every third account stays with the current user and the rest are spread.
+                Rep__c = !assignToMe ? a.OwnerId : (reps.size() == 1 || Math.mod(idx, 3) == 0
+                    ? reps[0] : reps[1 + Math.mod(idx, reps.size() - 1)]),
                 Is_Demo__c = true
             ));
             idx++;

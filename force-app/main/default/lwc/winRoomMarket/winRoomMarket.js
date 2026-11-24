@@ -4,7 +4,7 @@ import importMarket from "@salesforce/apex/WinRoomController.importMarket";
 import autoMatchMarket from "@salesforce/apex/WinRoomController.autoMatchMarket";
 import setMarketMapping from "@salesforce/apex/WinRoomController.setMarketMapping";
 import searchAllAccounts from "@salesforce/apex/WinRoomController.searchAllAccounts";
-import { money, pct, formatDate, reduceErrors } from "c/winRoomUtils";
+import { money, pct, formatDate, reduceErrors, tourRect } from "c/winRoomUtils";
 
 const HISTORY = 24;
 const CHUNK = 150;
@@ -110,6 +110,12 @@ export function parseNjr(texts) {
 }
 
 export default class WinRoomMarket extends LightningElement {
+    /** Tour support: scrolls to and measures one block of this page (selector inside the template). */
+    @api
+    tourRect(selector, scroll) {
+        return tourRect(this.template, selector, scroll);
+    }
+
     @api isAdmin = false;
     data;
     error;

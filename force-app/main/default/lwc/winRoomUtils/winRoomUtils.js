@@ -102,3 +102,19 @@ export function decoratePointer(p) {
         scoreStyle: `width:${Math.max(4, Math.min(100, p.score || 0))}%`
     };
 }
+
+/**
+ * Finds an element of a component template, optionally scrolls it into view, and returns its viewport rectangle
+ * (plain object) for the page tour; null when it is not rendered.
+ */
+export function tourRect(root, selector, scroll) {
+    const el = root && root.querySelector(selector);
+    if (!el) return null;
+    if (scroll && el.scrollIntoView) {
+        const tall = el.getBoundingClientRect().height > window.innerHeight * 0.6;
+        el.scrollIntoView({ block: tall ? "start" : "center", inline: "nearest" });
+    }
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return null;
+    return { top: r.top, left: r.left, width: r.width, height: r.height };
+}

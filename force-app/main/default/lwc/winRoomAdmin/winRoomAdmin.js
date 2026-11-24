@@ -1,4 +1,4 @@
-import { LightningElement } from "lwc";
+import { LightningElement, api } from "lwc";
 import LightningConfirm from "lightning/confirm";
 import getRules from "@salesforce/apex/WinRoomController.getRules";
 import saveRule from "@salesforce/apex/WinRoomController.saveRule";
@@ -12,22 +12,82 @@ import getProductLines from "@salesforce/apex/WinRoomController.getProductLines"
 import generateMockData from "@salesforce/apex/WinRoomController.generateMockData";
 import purgeMockData from "@salesforce/apex/WinRoomController.purgeMockData";
 import getJobStatus from "@salesforce/apex/WinRoomController.getJobStatus";
-import { money, statusClass, reduceErrors } from "c/winRoomUtils";
+import deleteRule from "@salesforce/apex/WinRoomController.deleteRule";
+import createDemoTeam from "@salesforce/apex/WinRoomController.createDemoTeam";
+import getContext from "@salesforce/apex/WinRoomController.getContext";
+import { money, statusClass, reduceErrors, tourRect } from "c/winRoomUtils";
 
-const RULE_HELP = {
-    WINBACK_SOFT: "Recent window vs. same window last year. Threshold = min. drop; Recent = window months.",
-    WINBACK_HARD: "No units in the Recent months; previous Lookback months must reach Min value.",
-    ATTACH: "Target/anchor units below Expected ratio x (1 - Threshold). Prior-year ratio decides win back vs cross-sell.",
-    CAPITAL_PULLTHROUGH: "Anchor capital line used, target workflow not. Expected ratio = robotic share of hip cases.",
-    PEER_WHITESPACE: "Line bought by at least Threshold % of hospitals in the same segment, never by this one.",
-    SURGEON_SITE: "Surgeon uses Contoso elsewhere, operates here without Contoso. Threshold = share of cases winnable.",
-    NEW_SURGEON: "Affiliation started in the last Recent months, no Contoso cases. Threshold = share of cases winnable.",
-    TENDER_RADAR: "Open tender with deadline within Lookback months. Threshold = win probability.",
-    SHARE_OF_WALLET: "Contoso revenue / estimated market below Threshold. Expected ratio = target share."
+const MONEY = "Minimum value at stake (EUR / yr)";
+/** What each rule type does and which generic parameters it reads (with their meaning for that type). */
+const RULE_TYPES = {
+    WINBACK_SOFT: {
+        label: "Win-back soft (volume decline)", category: "Win back",
+        help: "Revenue of a product line in the recent window dropped at least the threshold vs the same window a year earlier. Value = the gap, annualised.",
+        fields: { Threshold_Pct__c: "Minimum drop (%)", Min_Value__c: MONEY, Lookback_Months__c: "History used (months)", Recent_Months__c: "Recent window (months)" }
+    },
+    WINBACK_HARD: {
+        label: "Win-back hard (line stopped)", category: "Win back",
+        help: "No units in the recent window for a line that sold at least the minimum value in the lookback before. Value = the lost 12-month revenue.",
+        fields: { Min_Value__c: "Minimum revenue before the stop (EUR)", Lookback_Months__c: "Lookback before the stop (months)", Recent_Months__c: "Months without orders" }
+    },
+    ATTACH: {
+        label: "Attach / partial switch", category: "Cross-sell",
+        help: "Target units per anchor unit are below the expected ratio minus the tolerance. If the account used to buy at the ratio it is a partial switch (win back), otherwise a cross-sell gap.",
+        fields: { Expected_Ratio__c: "Expected target units per anchor unit", Threshold_Pct__c: "Tolerance below the ratio (%)", Min_Value__c: MONEY, Lookback_Months__c: "Window (months)" },
+        lines: { Anchor_Lines__c: "Anchor product lines", Target_Lines__c: "Target product lines" }
+    },
+    CAPITAL_PULLTHROUGH: {
+        label: "Capital pull-through", category: "Cross-sell",
+        help: "The account uses the anchor capital line but not the target workflow, although it has the procedure volume.",
+        fields: { Expected_Ratio__c: "Share of procedures expected on the workflow (0-1)", Min_Value__c: MONEY, Lookback_Months__c: "Window (months)" },
+        lines: { Anchor_Lines__c: "Capital line in use", Target_Lines__c: "Workflow line expected" }
+    },
+    PEER_WHITESPACE: {
+        label: "Peer white space", category: "Cross-sell",
+        help: "At least the threshold % of hospitals in the same segment (minimum 4 peers) buy a line this account does not.",
+        fields: { Threshold_Pct__c: "Share of peers that buy the line (%)", Min_Value__c: MONEY, Lookback_Months__c: "Window (months)" }
+    },
+    SURGEON_SITE: {
+        label: "Surgeon site expansion", category: "Surgeons & site expansion",
+        help: "A surgeon who buys from us at another hospital also operates here, with no usage at this site.",
+        fields: { Threshold_Pct__c: "Share of the surgeon's cases we can win (%)", Min_Value__c: MONEY, Lookback_Months__c: "Window (months)" }
+    },
+    NEW_SURGEON: {
+        label: "New surgeon", category: "Surgeons & site expansion",
+        help: "A surgeon joined the hospital in the recent window and has no cases with us yet.",
+        fields: { Threshold_Pct__c: "Share of cases we can win (%)", Min_Value__c: MONEY, Lookback_Months__c: "Window (months)", Recent_Months__c: "Joined within (months)" }
+    },
+    TENDER_RADAR: {
+        label: "Tender radar", category: "New accounts & tenders",
+        help: "An open tender linked to the account closes within the lookback. Value = estimated value x win probability.",
+        fields: { Threshold_Pct__c: "Win probability (%)", Min_Value__c: MONEY, Lookback_Months__c: "Deadline within (months)" }
+    },
+    SHARE_OF_WALLET: {
+        label: "Share of wallet", category: "New accounts & tenders",
+        help: "Our 12-month revenue / estimated market (procedures x basket) is below the threshold. Value = target share x market - our revenue.",
+        fields: { Threshold_Pct__c: "Flag below this share (%)", Expected_Ratio__c: "Target share (0-1)", Min_Value__c: MONEY, Lookback_Months__c: "Window (months)" }
+    },
+    CONTRACT_COMPLIANCE: {
+        label: "Contract compliance", category: "Win back",
+        help: "A contract line is under or over its commitment to date and over the run-rate window. Shortfall = win back, overrun = renegotiate.",
+        fields: { Threshold_Pct__c: "Deviation that triggers (%)", Min_Value__c: MONEY, Recent_Months__c: "Run-rate window (months)" }
+    },
+    CONTRACT_RENEWAL: {
+        label: "Contract renewal", category: "New accounts & tenders",
+        help: "An active contract ends within the lookback, so the renewal starts before a tender.",
+        fields: { Min_Value__c: MONEY, Lookback_Months__c: "Ends within (months)" }
+    }
 };
+const NUMERIC = ["Weight__c", "Threshold_Pct__c", "Min_Value__c", "Lookback_Months__c", "Recent_Months__c", "Expected_Ratio__c"];
 const POLL_MS = 3000;
 
 export default class WinRoomAdmin extends LightningElement {
+    /** Tour support: scrolls to and measures one block of this page (selector inside the template). */
+    @api
+    tourRect(selector, scroll) {
+        return tourRect(this.template, selector, scroll);
+    }
+
     rules = [];
     runs = [];
     stats;
@@ -43,8 +103,25 @@ export default class WinRoomAdmin extends LightningElement {
     job;
     tab = "rules";
 
+    defaultCodes = [];
+
     connectedCallback() {
         this.refreshAll();
+        getContext()
+            .then((c) => {
+                this.defaultCodes = c.defaultRuleCodes || [];
+            })
+            .catch(() => {
+                this.defaultCodes = [];
+            });
+    }
+    renderedCallback() {
+        // Text areas inside the dialog are filled imperatively: the value binding is not applied on first render.
+        if (!this.editing) return;
+        this.template.querySelectorAll(".modal textarea[data-field]").forEach((t) => {
+            const v = this.editing[t.dataset.field] || "";
+            if (t !== this.template.activeElement && t.value !== v) t.value = v;
+        });
     }
     disconnectedCallback() {
         window.clearTimeout(this._poll);
@@ -122,7 +199,9 @@ export default class WinRoomAdmin extends LightningElement {
     get ruleRows() {
         return this.rules.map((r) => ({
             ...r,
-            help: RULE_HELP[r.Rule_Type__c] || "",
+            help: (RULE_TYPES[r.Rule_Type__c] || {}).help || "",
+            typeLabel: (RULE_TYPES[r.Rule_Type__c] || {}).label || r.Rule_Type__c,
+            isCustom: this.defaultCodes.length > 0 && !this.defaultCodes.includes(r.Code__c),
             lookbackText: `${r.Lookback_Months__c || "–"} / ${r.Recent_Months__c || "–"}`,
             thresholdText: r.Threshold_Pct__c !== undefined && r.Threshold_Pct__c !== null ? `${r.Threshold_Pct__c}%` : "–",
             minText: money(r.Min_Value__c),
@@ -165,19 +244,116 @@ export default class WinRoomAdmin extends LightningElement {
         return `Background job: ${this.job.status} (${this.job.processed || 0}/${this.job.total || 0} batches)${this.job.errors ? " - " + this.job.errors + " errors" : ""}`;
     }
     get ruleTypeOptions() {
-        return Object.keys(RULE_HELP).map((k) => ({ label: k, value: k }));
+        return Object.keys(RULE_TYPES).map((k) => ({ label: RULE_TYPES[k].label, value: k, hint: k }));
     }
     get categoryOptions() {
         return ["Win back", "Cross-sell", "Surgeons & site expansion", "New accounts & tenders"].map((c) => ({ label: c, value: c }));
     }
     get editHelp() {
-        return this.editing ? RULE_HELP[this.editing.Rule_Type__c] : "";
+        return this.editing ? (RULE_TYPES[this.editing.Rule_Type__c] || {}).help : "";
+    }
+    get isNewRule() {
+        return this.editing && !this.editing.Id;
+    }
+    get modalEyebrow() {
+        return this.isNewRule ? "New rule" : "Edit rule";
+    }
+    get modalTitle() {
+        return (this.editing && this.editing.Name) || "Untitled rule";
+    }
+    get saveLabel() {
+        return this.isNewRule ? "Create rule" : "Save rule";
+    }
+    get saveDisabled() {
+        const e = this.editing;
+        return this.busy || !e || !e.Name || !e.Code__c || !e.Rule_Type__c || !e.Category__c;
+    }
+    get canDelete() {
+        return this.editing && this.editing.Id && !this.defaultCodes.includes(this.editing.Code__c);
+    }
+    get paramFields() {
+        const t = this.editing && RULE_TYPES[this.editing.Rule_Type__c];
+        if (!t) return [];
+        return Object.keys(t.fields).map((field) => ({
+            field,
+            label: t.fields[field],
+            value: this.editing[field],
+            step: field === "Expected_Ratio__c" ? "0.05" : field === "Min_Value__c" ? "1000" : "1"
+        }));
+    }
+    get lineFields() {
+        const t = this.editing && RULE_TYPES[this.editing.Rule_Type__c];
+        if (!t || !t.lines) return [];
+        return Object.keys(t.lines).map((field) => {
+            const selected = (this.editing[field] || "").split(",").map((c) => c.trim()).filter((c) => c);
+            return {
+                field,
+                label: t.lines[field],
+                chips: this.lines.map((l) => ({
+                    code: l.Code__c,
+                    name: l.Name,
+                    pressed: selected.includes(l.Code__c) ? "true" : "false",
+                    cls: selected.includes(l.Code__c) ? "chip chip_on" : "chip"
+                }))
+            };
+        });
     }
 
     // ---------------------------------------------------------------- rules
     editRule(e) {
         const r = this.rules.find((x) => x.Id === e.currentTarget.dataset.id);
         this.editing = { ...r };
+        this.focusModal();
+    }
+    newRule() {
+        this.editing = {
+            Name: "", Code__c: "", Rule_Type__c: "WINBACK_SOFT", Category__c: RULE_TYPES.WINBACK_SOFT.category,
+            Active__c: true, Weight__c: 3, Threshold_Pct__c: 25, Min_Value__c: 10000, Lookback_Months__c: 12, Recent_Months__c: 6
+        };
+        this.focusModal();
+    }
+    focusModal() {
+        // eslint-disable-next-line @lwc/lwc/no-async-operation
+        window.requestAnimationFrame(() => {
+            const input = this.template.querySelector(".modal .rule-name");
+            if (input) input.focus();
+        });
+    }
+    handleModalKey(e) {
+        if (e.key === "Escape") this.cancelEdit();
+    }
+    toggleLine(e) {
+        const { field, code } = e.currentTarget.dataset;
+        const current = (this.editing[field] || "").split(",").map((c) => c.trim()).filter((c) => c);
+        const next = current.includes(code) ? current.filter((c) => c !== code) : [...current, code];
+        this.editing = { ...this.editing, [field]: next.join(",") };
+    }
+    async deleteEditing() {
+        const ok = await LightningConfirm.open({ message: `Delete the rule "${this.editing.Name}"? Its pointers stay, without a rule.`, label: "Delete rule", theme: "error" });
+        if (!ok) return;
+        this.busy = true;
+        try {
+            await deleteRule({ ruleId: this.editing.Id });
+            this.editing = undefined;
+            this.rules = await getRules();
+            this.message = "Rule deleted.";
+        } catch (err) {
+            this.error = reduceErrors(err);
+        } finally {
+            this.busy = false;
+        }
+    }
+    async doCreateTeam() {
+        this.busy = true;
+        try {
+            const n = await createDemoTeam();
+            this.message = `Demo team ready: ${n} reps report to you. Generate the demo data to spread the accounts across the team.`;
+            this.dispatchEvent(new CustomEvent("datachanged"));
+        } catch (err) {
+            this.error = reduceErrors(err);
+        } finally {
+            this.busy = false;
+        }
     }
     cancelEdit() {
         this.editing = undefined;
@@ -185,10 +361,17 @@ export default class WinRoomAdmin extends LightningElement {
     handleRuleField(e) {
         const f = e.target.dataset.field;
         let v = e.target.type === "toggle" || e.target.type === "checkbox" ? e.target.checked : e.detail.value !== undefined ? e.detail.value : e.target.value;
-        if (["Weight__c", "Threshold_Pct__c", "Min_Value__c", "Lookback_Months__c", "Recent_Months__c", "Expected_Ratio__c"].includes(f)) {
+        if (NUMERIC.includes(f)) {
             v = v === "" || v === null ? null : Number(v);
         }
-        this.editing = { ...this.editing, [f]: v };
+        const next = { ...this.editing, [f]: v };
+        if (f === "Rule_Type__c" && RULE_TYPES[v]) {
+            next.Category__c = RULE_TYPES[v].category;
+        }
+        if (f === "Name" && !this.editing.Id) {
+            next.Code__c = `CUSTOM_${(v || "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "")}`.slice(0, 60);
+        }
+        this.editing = next;
     }
     async saveEditing() {
         this.busy = true;
@@ -199,6 +382,7 @@ export default class WinRoomAdmin extends LightningElement {
             this.editing = undefined;
             this.rules = await getRules();
             this.message = "Rule saved. Run the engine to apply it.";
+            this.error = undefined;
         } catch (e) {
             this.error = reduceErrors(e);
         } finally {

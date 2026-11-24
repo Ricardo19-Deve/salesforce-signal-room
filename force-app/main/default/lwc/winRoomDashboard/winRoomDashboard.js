@@ -1,8 +1,14 @@
 import { LightningElement, api } from "lwc";
 import getDashboard from "@salesforce/apex/WinRoomController.getDashboard";
-import { CATEGORIES, CATEGORY_META, money, pct, decoratePointer, reduceErrors } from "c/winRoomUtils";
+import { CATEGORIES, CATEGORY_META, money, pct, decoratePointer, reduceErrors, tourRect } from "c/winRoomUtils";
 
 export default class WinRoomDashboard extends LightningElement {
+    /** Tour support: scrolls to and measures one block of this page (selector inside the template). */
+    @api
+    tourRect(selector, scroll) {
+        return tourRect(this.template, selector, scroll);
+    }
+
     _scope;
     _country;
     _refreshKey;
