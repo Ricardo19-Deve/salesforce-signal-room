@@ -28,6 +28,18 @@ export default class WinRoomContracts extends LightningElement {
         return tourRect(this.template, selector, scroll);
     }
 
+    /** Tour support: opens the first contract, or goes back to the list. */
+    @api
+    async tourAction(action) {
+        if (action === "open-first" && !this.detail) {
+            if (!this.list) await this.loadList();
+            const first = ((this.list && this.list.contracts) || [])[0];
+            if (first) await this.openContract(first.contractId);
+        } else if (action === "back" && this.detail) {
+            this.back();
+        }
+    }
+
     @api isAdmin = false;
     _refreshKey;
     list;

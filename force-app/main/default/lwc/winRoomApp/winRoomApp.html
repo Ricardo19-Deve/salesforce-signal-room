@@ -92,7 +92,7 @@
         <template lwc:if={tourOn}>
             <div class="tour" role="presentation" tabindex="-1" onkeydown={handleTourKey}>
                 <div class={shadeClass} style={shadeStyle}></div>
-                <section class="tour-pop" style={popStyle} role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-body">
+                <section class={tourPopClass} style={popStyle} role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-body">
                     <div class="tour-count">{tourCount}</div>
                     <h3 id="tour-title">{tourStep.title}</h3>
                     <p id="tour-body">{tourStep.body}</p>
@@ -100,7 +100,7 @@
                         <div class="tour-data"><span class="tour-data-label">Data</span><span>{tourStep.data}</span></div>
                     </template>
                     <template lwc:if={tourMissing}>
-                        <div class="tour-missing">This part is not on screen yet (for example, select an account or a session first).</div>
+                        <div class="tour-missing">There is no data for this block in this org yet, so it is not on screen.</div>
                     </template>
                     <div class="tour-progress" aria-hidden="true"><div class="tour-progress-fill" style={progressStyle}></div></div>
                     <div class="tour-actions">

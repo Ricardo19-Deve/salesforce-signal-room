@@ -71,7 +71,7 @@
             </div>
 
             <div class="body">
-                <div class="wr-card">
+                <div class="wr-card" data-tour="why">
                     <div class="wr-card-title"><lightning-icon icon-name="utility:info" size="x-small"></lightning-icon>Why this pointer <span class="wr-card-sub">{p.rule}</span></div>
                     <p class="rationale">{p.rationale}</p>
                     <div class="facts">
@@ -86,7 +86,7 @@
                     </template>
                 </div>
 
-                <div class="wr-card">
+                <div class="wr-card" data-tour="ai">
                     <div class="wr-card-title">
                         <lightning-icon icon-name="utility:einstein" size="x-small"></lightning-icon>AI insight - the why and the what
                         <button type="button" class="wr-btn push" onclick={generateAi} disabled={aiBusy}><lightning-icon icon-name="utility:magicwand" size="xx-small" class="wr-btn-icon"></lightning-icon>{aiButtonLabel}</button>
@@ -112,14 +112,14 @@
                     </template>
                 </div>
 
-                <div class="wr-card">
+                <div class="wr-card" data-tour="playbook">
                     <div class="wr-card-title"><lightning-icon icon-name="utility:knowledge_base" size="x-small"></lightning-icon>Playbook - best-of-best actions</div>
                     <ol class="bullets">
                         <template for:each={playbook} for:item="s"><li key={s.key}>{s.text}</li></template>
                     </ol>
                 </div>
 
-                <div class="wr-card">
+                <div class="wr-card" data-tour="commitments">
                     <div class="wr-card-title"><lightning-icon icon-name="utility:task" size="x-small"></lightning-icon>Commitments</div>
                     <template lwc:if={hasCommitments}>
                         <table class="wr-table">

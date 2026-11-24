@@ -14,6 +14,14 @@ export default class WinRoomPointers extends LightningElement {
         return tourRect(this.template, selector, scroll);
     }
 
+    /** Tour support: opens the first pointer of the list in the drawer. */
+    @api
+    tourAction(action) {
+        if (action === "open-first" && this.rows.length) {
+            this.dispatchEvent(new CustomEvent("openpointer", { detail: { pointerId: this.rows[0].id } }));
+        }
+    }
+
     _scope;
     _country;
     _refreshKey;

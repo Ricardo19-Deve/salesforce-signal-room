@@ -10,6 +10,17 @@ export default class WinRoomAccount360 extends LightningElement {
         return tourRect(this.template, selector, scroll);
     }
 
+    /** Tour support: opens the first account when none is selected. */
+    @api
+    async tourAction(action) {
+        if (action !== "open-first" || this._accountId) return;
+        if (!this.accounts || !this.accounts.length) await this.loadList();
+        if (this.accounts && this.accounts.length) {
+            this._accountId = this.accounts[0].accountId;
+            await this.loadAccount();
+        }
+    }
+
     _accountId;
     _refreshKey;
     accounts = [];

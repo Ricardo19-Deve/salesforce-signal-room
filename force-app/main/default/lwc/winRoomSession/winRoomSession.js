@@ -19,6 +19,12 @@ export default class WinRoomSession extends LightningElement {
         return tourRect(this.template, selector, scroll);
     }
 
+    /** Tour support: makes sure a session is open. */
+    @api
+    async tourAction(action) {
+        if (action === "open-first" && !this.agenda) await this.loadSessions();
+    }
+
     _country;
     _refreshKey;
     team = "GB";

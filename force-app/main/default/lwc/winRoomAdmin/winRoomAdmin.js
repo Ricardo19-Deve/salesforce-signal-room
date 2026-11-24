@@ -88,6 +88,15 @@ export default class WinRoomAdmin extends LightningElement {
         return tourRect(this.template, selector, scroll);
     }
 
+    /** Tour support: switches tab ("tab:<key>"). */
+    @api
+    tourAction(action) {
+        if (action && action.startsWith("tab:")) {
+            this.editing = undefined;
+            this.tab = action.slice(4);
+        }
+    }
+
     rules = [];
     runs = [];
     stats;

@@ -118,6 +118,7 @@
     padding: 1rem 1.1rem 0.9rem;
     transition: top 0.25s ease, left 0.25s ease;
 }
+.tour-pop_busy { opacity: 0.55; }
 .tour-count { font-size: 0.6875rem; color: var(--wr-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
 .tour-pop h3 { margin: 0.3rem 0 0.35rem; font-size: 1rem; font-weight: 650; color: var(--wr-ink); }
 .tour-pop p { margin: 0; line-height: 1.5; color: var(--wr-ink-2); font-size: 0.8125rem; }

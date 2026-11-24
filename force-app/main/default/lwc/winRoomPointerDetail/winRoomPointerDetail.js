@@ -7,10 +7,24 @@ import enrichWithAI from "@salesforce/apex/WinRoomController.enrichWithAI";
 import saveCommitment from "@salesforce/apex/WinRoomController.saveCommitment";
 import updateCommitment from "@salesforce/apex/WinRoomController.updateCommitment";
 import {
-    REJECTION_REASONS, money, formatDate, todayIso, priorityClass, statusClass, reduceErrors
+    REJECTION_REASONS, money, formatDate, todayIso, priorityClass, statusClass, reduceErrors,
+    tourRect
 } from "c/winRoomUtils";
 
+/** Models sometimes return objects ({action, owner, due}) instead of strings: show their values as text. */
+function aiText(item) {
+    if (item === null || item === undefined) return "";
+    if (typeof item !== "object") return String(item);
+    return Object.values(item).filter((v) => v !== null && v !== undefined && v !== "").map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v))).join(" · ");
+}
+
 export default class WinRoomPointerDetail extends NavigationMixin(LightningElement) {
+    /** Tour support: scrolls to and measures one block of the drawer. */
+    @api
+    tourRect(selector, scroll) {
+        return this.ready ? tourRect(this.template, selector, scroll) : null;
+    }
+
     _pointerId;
     p;
     error;
@@ -121,7 +135,7 @@ export default class WinRoomPointerDetail extends NavigationMixin(LightningEleme
         ];
         return lists
             .filter(([k]) => Array.isArray(this.ai[k]) && this.ai[k].length)
-            .map(([k, label]) => ({ key: k, label, items: this.ai[k].map((t, i) => ({ key: `${k}${i}`, text: t })) }));
+            .map(([k, label]) => ({ key: k, label, items: this.ai[k].map((t, i) => ({ key: `${k}${i}`, text: aiText(t) })) }));
     }
     get aiNote() {
         if (!this.ai) return "";
