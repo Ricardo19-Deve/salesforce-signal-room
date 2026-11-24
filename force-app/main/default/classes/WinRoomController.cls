@@ -10,8 +10,8 @@
  *  Contracts      getContracts, getContract, saveContract, deleteContract
  *  Tenders        getTenders, syncTenders, saveTenderSource, scheduleTenderSync, autoMatchTenders,
  *                 setTenderMapping, setTenderStatus
- *  Admin          getRules, saveRule, resetRules, runEngine, getRuns, getProfiles,
- *                 updateProfile, generateMockData, purgeMockData, getJobStatus
+ *  Admin          getRules, saveRule, deleteRule, resetRules, runEngine, getRuns, getProfiles,
+ *                 updateProfile, createDemoTeam, generateMockData, purgeMockData, getJobStatus
  */
 public with sharing class WinRoomController {
 
@@ -46,6 +46,8 @@ public with sharing class WinRoomController {
             'profiles' => [SELECT COUNT() FROM WR_Account_Profile__c],
             'pointers' => [SELECT COUNT() FROM WR_Pointer__c],
             'rules' => [SELECT COUNT() FROM WR_Rule__c],
+            'teamSize' => teamIds().size() - 1,
+            'defaultRuleCodes' => defaultRuleCodes(),
             'lastRun' => runs.isEmpty() ? null : runs[0]
         };
     }
@@ -1191,6 +1193,29 @@ public with sharing class WinRoomController {
         return rule;
     }
 
+    /** Deletes a rule an admin added. Default rules can only be deactivated (Reset rules would bring them back). */
+    @AuraEnabled
+    public static void deleteRule(Id ruleId) {
+        requireAdmin();
+        WR_Rule__c r = [SELECT Id, Code__c FROM WR_Rule__c WHERE Id = :ruleId];
+        for (WR_Rule__c d : WinRoomRules.defaultRules()) {
+            if (d.Code__c == r.Code__c) {
+                throw error('Default rules cannot be deleted. Deactivate the rule instead.');
+            }
+        }
+        delete as user r;
+    }
+
+    @AuraEnabled
+    public static Integer createDemoTeam() {
+        requireAdmin();
+        try {
+            return WinRoomMockData.createDemoTeam();
+        } catch (Exception e) {
+            throw error('Demo team creation failed: ' + e.getMessage());
+        }
+    }
+
     @AuraEnabled
     public static void resetRules() {
         requireAdmin();
@@ -1317,6 +1342,24 @@ public with sharing class WinRoomController {
         ];
     }
 
+    /** My team = me plus the users whose manager I am (standard User.ManagerId). */
+    private static List<String> defaultRuleCodes() {
+        List<String> out = new List<String>();
+        for (WR_Rule__c d : WinRoomRules.defaultRules()) {
+            out.add(d.Code__c);
+        }
+        return out;
+    }
+
+    @TestVisible
+    static Set<Id> teamIds() {
+        Set<Id> ids = new Set<Id>{ UserInfo.getUserId() };
+        for (User u : [SELECT Id FROM User WHERE ManagerId = :UserInfo.getUserId() AND IsActive = true LIMIT 500]) {
+            ids.add(u.Id);
+        }
+        return ids;
+    }
+
     /** First open stage of the org's sales process, so the module works with any stage names. */
     @TestVisible
     static String firstOpenStage() {
@@ -1330,6 +1373,8 @@ public with sharing class WinRoomController {
         String cond = 'WHERE Id != null';
         if (scope == 'mine') {
             cond += ' AND Assigned_To__c = :userId';
+        } else if (scope == 'team') {
+            cond += ' AND Assigned_To__c IN :teamIds';
         }
         if (String.isNotBlank(country)) {
             cond += ' AND Country__c = :country';
@@ -1338,7 +1383,7 @@ public with sharing class WinRoomController {
     }
 
     private static Map<String, Object> baseBinds(String scope, String country) {
-        return new Map<String, Object>{ 'userId' => UserInfo.getUserId(), 'country' => country };
+        return new Map<String, Object>{ 'userId' => UserInfo.getUserId(), 'country' => country, 'teamIds' => teamIds() };
     }
 
     private static List<Object> groupBy(String field, String cond, Map<String, Object> binds) {

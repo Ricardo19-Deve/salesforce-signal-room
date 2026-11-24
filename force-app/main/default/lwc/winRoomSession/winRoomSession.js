@@ -8,11 +8,17 @@ import completeSession from "@salesforce/apex/WinRoomController.completeSession"
 import saveSessionNotes from "@salesforce/apex/WinRoomController.saveSessionNotes";
 import sessionBrief from "@salesforce/apex/WinRoomController.sessionBrief";
 import searchUsers from "@salesforce/apex/WinRoomController.searchUsers";
-import { decoratePointer, money, formatDate, daysUntil, statusClass, todayIso, reduceErrors } from "c/winRoomUtils";
+import { decoratePointer, money, formatDate, daysUntil, statusClass, todayIso, reduceErrors, tourRect } from "c/winRoomUtils";
 
 const TEAMS = ["GB", "DE", "FR", "ES", "IT", "All"];
 
 export default class WinRoomSession extends LightningElement {
+    /** Tour support: scrolls to and measures one block of this page (selector inside the template). */
+    @api
+    tourRect(selector, scroll) {
+        return tourRect(this.template, selector, scroll);
+    }
+
     _country;
     _refreshKey;
     team = "GB";

@@ -6,7 +6,7 @@ import deleteContract from "@salesforce/apex/WinRoomController.deleteContract";
 import getProductLines from "@salesforce/apex/WinRoomController.getProductLines";
 import searchAllAccounts from "@salesforce/apex/WinRoomController.searchAllAccounts";
 import LightningConfirm from "lightning/confirm";
-import { money, pct, formatDate, todayIso, decoratePointer, reduceErrors } from "c/winRoomUtils";
+import { money, pct, formatDate, todayIso, decoratePointer, reduceErrors, tourRect } from "c/winRoomUtils";
 
 const HEALTH_CLASS = {
     Under: "wr-health wr-health_under",
@@ -22,6 +22,12 @@ function signed(ratio) {
 
 /** Volume contracts: committed vs delivered per month, variance, run-rate and projection. */
 export default class WinRoomContracts extends LightningElement {
+    /** Tour support: scrolls to and measures one block of this page (selector inside the template). */
+    @api
+    tourRect(selector, scroll) {
+        return tourRect(this.template, selector, scroll);
+    }
+
     @api isAdmin = false;
     _refreshKey;
     list;

@@ -59,7 +59,7 @@
             </div>
         </div>
 
-        <div class="wr-card row">
+        <div class="wr-card row" data-tour="top">
             <div class="wr-card-title">Top 10 pointers <span class="wr-card-sub">open, ranked by priority score</span></div>
             <template lwc:if={hasTop}>
                 <div class="scroll">
@@ -89,7 +89,7 @@
             <template lwc:else><div class="wr-empty">No open pointers for this filter.</div></template>
         </div>
 
-        <div class="wr-card row">
+        <div class="wr-card row" data-tour="rules">
             <div class="wr-card-title">Rule performance <span class="wr-card-sub">rep feedback loop - acceptance below 40% means the rule needs tuning</span></div>
             <div class="scroll">
                 <table class="wr-table">

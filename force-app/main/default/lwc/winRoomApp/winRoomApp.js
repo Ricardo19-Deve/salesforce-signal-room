@@ -1,6 +1,7 @@
 import { LightningElement, api } from "lwc";
 import getContext from "@salesforce/apex/WinRoomController.getContext";
-import { reduceErrors, formatDate } from "c/winRoomUtils";
+import { reduceErrors, formatDate, tourRect } from "c/winRoomUtils";
+import { TOURS } from "./tourContent";
 
 const VIEWS = [
     { view: "dashboard", label: "Dashboard", icon: "utility:home", subtitle: "Where the value is and how the field is acting on it" },
@@ -33,6 +34,9 @@ export default class WinRoomApp extends LightningElement {
     selectedPointerId;
     selectedAccountId;
     guideSection = "overview";
+    tourOn = false;
+    tourIndex = 0;
+    tourBox;
     refreshKey = 0;
 
     connectedCallback() {
@@ -100,7 +104,8 @@ export default class WinRoomApp extends LightningElement {
     get scopeOptions() {
         return [
             { label: "All", value: "all" },
-            { label: "Mine", value: "mine" }
+            { label: "Mine", value: "mine" },
+            { label: "My team", value: "team" }
         ];
     }
     get countryOptions() {
@@ -146,6 +151,7 @@ export default class WinRoomApp extends LightningElement {
     }
 
     handleNav(event) {
+        if (this.tourOn) this.endTour();
         this.view = event.currentTarget.dataset.view;
     }
     handleScope(event) {
@@ -183,6 +189,117 @@ export default class WinRoomApp extends LightningElement {
     }
     goAdmin() {
         this.view = "admin";
+    }
+
+    // ---------------------------------------------------------------- tour
+    get hasTour() {
+        return !!TOURS[this.view];
+    }
+    get tourSteps() {
+        return TOURS[this.view] || [];
+    }
+    get tourStep() {
+        return this.tourSteps[this.tourIndex] || {};
+    }
+    get tourCount() {
+        return `${this.tourIndex + 1} of ${this.tourSteps.length} · ${this.current.label}`;
+    }
+    get tourFirst() {
+        return this.tourIndex === 0;
+    }
+    get tourNextLabel() {
+        return this.tourIndex === this.tourSteps.length - 1 ? "Finish" : "Next";
+    }
+    get tourMissing() {
+        return !this.tourBox;
+    }
+    get progressStyle() {
+        return `width:${Math.round(((this.tourIndex + 1) / this.tourSteps.length) * 100)}%`;
+    }
+    get shadeClass() {
+        return this.tourBox ? "tour-shade" : "tour-shade tour-shade_full";
+    }
+    get shadeStyle() {
+        const b = this.tourBox;
+        if (!b) return "";
+        const pad = 6;
+        return `top:${b.top - pad}px;left:${b.left - pad}px;width:${b.width + pad * 2}px;height:${b.height + pad * 2}px`;
+    }
+    get popStyle() {
+        const w = 380;
+        const h = 250;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const b = this.tourBox;
+        if (!b) return `top:${Math.max(16, vh / 2 - h / 2)}px;left:${Math.max(16, vw / 2 - w / 2)}px`;
+        let top;
+        let left = Math.min(Math.max(16, b.left), vw - w - 16);
+        if (b.top + b.height + 16 + h < vh) {
+            top = b.top + b.height + 16;
+        } else if (b.top - 16 - h > 0) {
+            top = b.top - 16 - h;
+        } else {
+            // Large block: keep the card inside it, top right.
+            top = Math.max(16, Math.min(b.top + 16, vh - h - 16));
+            left = Math.max(16, Math.min(b.left + b.width - w - 16, vw - w - 16));
+        }
+        return `top:${top}px;left:${left}px`;
+    }
+    startTour() {
+        this.selectedPointerId = undefined;
+        this.tourIndex = 0;
+        this.tourOn = true;
+        this._onMove = () => this.measureTour(false);
+        window.addEventListener("scroll", this._onMove, true);
+        window.addEventListener("resize", this._onMove);
+        this.showTourStep();
+    }
+    endTour() {
+        this.tourOn = false;
+        this.tourBox = undefined;
+        window.removeEventListener("scroll", this._onMove, true);
+        window.removeEventListener("resize", this._onMove);
+    }
+    disconnectedCallback() {
+        if (this.tourOn) this.endTour();
+    }
+    tourNext() {
+        if (this.tourIndex >= this.tourSteps.length - 1) {
+            this.endTour();
+            return;
+        }
+        this.tourIndex++;
+        this.showTourStep();
+    }
+    tourBack() {
+        if (this.tourIndex > 0) {
+            this.tourIndex--;
+            this.showTourStep();
+        }
+    }
+    handleTourKey(e) {
+        if (e.key === "Escape") this.endTour();
+        else if (e.key === "ArrowRight" || e.key === "Enter") this.tourNext();
+        else if (e.key === "ArrowLeft") this.tourBack();
+    }
+    showTourStep() {
+        this.measureTour(true);
+        // eslint-disable-next-line @lwc/lwc/no-async-operation
+        window.requestAnimationFrame(() => {
+            this.measureTour(false);
+            const next = this.template.querySelector(".tour-next");
+            if (next) next.focus();
+        });
+    }
+    measureTour(scroll) {
+        if (!this.tourOn) return;
+        const target = this.tourStep.target || "";
+        if (target.startsWith("page:")) {
+            const host = this.template.querySelector("[data-tour-host]");
+            this.tourBox = host && host.tourRect ? host.tourRect(target.slice(5), scroll) : null;
+        } else {
+            this.tourBox = tourRect(this.template, `[data-tour="${target}"]`, scroll);
+        }
     }
     openGuide() {
         this.guideSection = "overview";

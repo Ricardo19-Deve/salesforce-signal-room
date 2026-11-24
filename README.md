@@ -1,6 +1,6 @@
 # Salesforce Win Room
 
-A **win room** for field sales, built natively on Salesforce with Apex and Lightning Web Components. A rules engine reads monthly sell-in and finds **customer-level opportunities** ("pointers"). Reps review them with the numbers behind each one and an optional AI summary, then accept, reject or turn them into Opportunities. A **weekly win room** asks the same 7 questions every 7 days, so the opportunities turn into committed actions. **Contracts** track committed volumes against what was delivered, a **market** view shows hospital procedure volumes from a public registry, and a **tender radar** reads real public tenders from the official EU and UK procurement APIs. A built-in **guide** explains every page, where its data comes from and how each number is calculated, and doubles as the demo script.
+A **win room** for field sales, built natively on Salesforce with Apex and Lightning Web Components. A rules engine reads monthly sell-in and finds **customer-level opportunities** ("pointers"). Reps review them with the numbers behind each one and an optional AI summary, then accept, reject or turn them into Opportunities. A **weekly win room** asks the same 7 questions every 7 days, so the opportunities turn into committed actions. **Contracts** track committed volumes against what was delivered, a **market** view shows hospital procedure volumes from a public registry, and a **tender radar** reads real public tenders from the official EU and UK procurement APIs. A built-in **guide** explains every page, where its data comes from and how each number is calculated, and an interactive **tour** on every page highlights each block and explains it, for demos and onboarding.
 
 This is a neutral open-source reference with fictitious data. The demo domain is orthopaedic implants (knees, hips, surgical robots) sold to hospitals, but the engine, the data model and the portal are generic. The only real data is optional and public: the UK National Joint Registry procedure volumes, which you download yourself, and public tender notices, which the org reads from the official APIs. Neither is included in the repository.
 
@@ -16,7 +16,9 @@ This is a neutral open-source reference with fictitious data. The demo domain is
 | **Market (public registry)** | Upload the public CSV export of the UK **National Joint Registry** (NJR StatsOnline): the browser keeps the last 24 complete months and stores one record per hospital with its hip / knee volumes and trend. Hospitals are matched to Accounts by hospital or trust name (suggestions need a distinctive shared word; admins confirm). Mapped accounts use the real volumes for share of wallet and peer sizing. No scraping and no callout. |
 | **Public tenders** | A sync reads **TED** (EU / EEA, Search API v3), **Find a Tender** (UK, OCDS) and **Public Contracts Scotland** (OCDS), anonymously and within the portals' fair-use limits. Notices are filtered by CPV prefix (default: orthopaedic implants and fracture fixation), normalised (title, buyer, country, earliest open deadline, lots summed, value converted to EUR, link to the official notice), categorised from multilingual keywords and de-duplicated across portals. Buyers are matched to Accounts of the same country (accents and noise words removed in several languages, each part of the name scored, automatic links need two agreeing words). Linked open tenders feed the tender radar rule; human statuses and links survive every sync. Runs on demand or daily. |
 | **In-portal guide** | Every page explained: what it shows, where the data comes from, each formula, the rule types and the live rule settings of the org, plus a 10-minute demo script. Each page has a *How this page works* link to its section. |
-| **Admin without code** | Thresholds, windows, product lines and playbooks are edited in the portal. The engine runs on demand, account scope is set per rollout phase, and demo data can be generated and purged. |
+| **Interactive tour** | A *Tour* button next to every page title dims the screen, highlights each block of the page in turn and explains what it is for and where its data comes from (step counter, back / next, keyboard, follows scrolling). Blocks that are not on screen yet are explained without a spotlight. |
+| **Team scope** | *All / Mine / My team* on the dashboard and the pointer list. My team = you and the users whose manager you are (standard `User.ManagerId`). The demo creates six fictitious reps (Chatter Free users, no welcome e-mail, no licence) reporting to you and spreads the accounts across the team. |
+| **Admin without code** | Thresholds, windows, product lines and playbooks are edited in a dialog that shows only the parameters each rule type uses; *New rule* adds a rule of any of the 11 types, and custom rules can be deleted (defaults only deactivated). The engine runs on demand, account scope is set per rollout phase, and demo data can be generated and purged. |
 | **Neutral UI** | Custom dropdowns, switches and buttons render the same in every org, whatever the org's brand colour. The portal runs as a Lightning tab or full screen on an Experience Cloud (LWR) site. |
 
 ## Screenshots
@@ -33,7 +35,9 @@ Captured in a Developer Edition org with the demo data (fictitious hospitals, su
 | ![Contract](docs/images/12-contract-detail.png) Contract: committed vs delivered per month, run-rate and projection per line | ![Contract pointer](docs/images/14-contract-pointer.png) Contract shortfall pointer with the delivery chart |
 | ![Market](docs/images/13-market.png) Market: public NJR hospital volumes (NHS file). The demo accounts are fictitious, so the hospitals stay unlinked | ![Tenders](docs/images/15-tenders.png) Tenders: real open notices from TED and Find a Tender, sources and filters, matched to accounts |
 | ![Tender](docs/images/16-tender-detail.png) Tender detail: description, reference, CPV codes, value in the notice currency and in EUR, status | ![Guide](docs/images/17-guide.png) Guide: the loop, design principles and where every piece of data comes from |
-| ![Calculations](docs/images/18-guide-calculations.png) Guide: rule types, priority score, dedupe and the live rule settings | |
+| ![Calculations](docs/images/18-guide-calculations.png) Guide: rule types, priority score, dedupe and the live rule settings | ![Team scope](docs/images/19-team-scope.png) My team scope: the pointers of you and your reports |
+| ![Tour](docs/images/20-tour.png) Page tour: each block highlighted and explained, with its data source | ![Tour step](docs/images/21-tour-top10.png) Tour step on the top 10 pointers |
+| ![Rule dialog](docs/images/22-rule-dialog.png) Rule dialog: parameters of the rule type, product lines as chips, playbook | ![New rule](docs/images/23-new-rule.png) New rule of any type, code generated from the name |
 
 ## How it works
 
@@ -91,6 +95,8 @@ sf org login web -a win-room
 sf project deploy start -o win-room -d force-app -l RunSpecifiedTests -t WinRoomTest
 sf org assign permset -o win-room -n Win_Room_Admin
 sf apex run -o win-room -f scripts/apex/seed-demo-data.apex
+# optional: six fictitious reps reporting to you, then regenerate in Rules & Data > Data
+sf apex run -o win-room -f scripts/apex/create-demo-team.apex
 ```
 
 Open the **Win Room** app. The seed creates 10 fictitious hospitals and runs the engine; pointers appear after 1–2 minutes (the header shows the engine status).
@@ -104,7 +110,7 @@ Open the **Win Room** app. The seed creates 10 fictitious hospitals and runs the
 
 ## Demo script (10 minutes)
 
-1. **Dashboard.** This is the bottom-up map of opportunities: value at stake, the four categories, value by country and by type, and the top 10.
+1. **Dashboard.** Press **Tour** next to the title for a guided walk through the page. Switch *All / Mine / My team*. This is the bottom-up map of opportunities: value at stake, the four categories, value by country and by type, and the top 10.
 2. **Pointers.** Filter *Type: Partial switch* and open **Partial switch: Meridian Tibial Tray**.
    - The rationale and the chart show tibial trays dropping while femoral volume continues.
    - **Generate AI insight** adds the why, the what, next best actions, questions and risks.
@@ -120,7 +126,8 @@ Open the **Win Room** app. The seed creates 10 fictitious hospitals and runs the
 6. **Market.** With the NJR file imported, sort by volume: every hospital with its hip and knee procedures, trend and market value; link a hospital to an account to switch its profile to real volumes.
 7. **Tenders.** Real open notices from the public portals: show the sources and their CPV filter, expand a notice (value in its currency and in EUR, link to the official notice) and filter *Account: Linked* to see the tenders that feed the tender radar pointers.
 8. **Rules & Data.**
-   - Change *Soft churn* from 25% to 30%, then **Run engine now**: decisions are kept and pointers update.
+   - Edit *Soft churn* (the dialog shows only the parameters of that rule type), change 25% to 30%, then **Run engine now**: decisions are kept and pointers update.
+   - **New rule**: add a second soft-churn rule with a stricter threshold, or delete a rule you added.
    - Show the account scope by rollout phase.
 
 Reset before a demo: **Rules & Data → Data → Purge demo data**, then **Generate demo data**, and run **Tenders → Sync now** so the deadlines are current. The **Guide** button (top right) has the same script and the calculations behind every number, if questions come up.
@@ -129,8 +136,8 @@ Reset before a demo: **Rules & Data → Data → Purge demo data**, then **Gener
 
 ## Tests
 
-- **Apex:** 18 tests in `WinRoomTest`, run as a user with the `Win_Room_Admin` permission set, so user-mode access is tested too. All passed in a Developer Edition org on 23 Nov 2026 (classes 87–100% covered). They plant every pattern, run the engine and check that each pointer type is found, that re-runs keep decisions and create no duplicates, the pointer lifecycle, the win room agenda, the AI parsing (mocked callout) and fallback, contract compliance and renewal pointers, the contract editor, the registry import, name matching and volume mapping (with fictitious registry rows), and the tender feeds (mocked TED, Find a Tender and Public Contracts Scotland responses: CPV filter, cross-portal dedupe, EUR conversion, categories, buyer matching, preserved decisions, sources and schedule).
-- **JavaScript:** `npm test` runs Jest on `winRoomUtils`, `winRoomSelect`, the registry CSV parser in `winRoomMarket`, the tender view and the guide (22 tests). `npm run lint` runs ESLint.
+- **Apex:** 20 tests in `WinRoomTest`, run as a user with the `Win_Room_Admin` permission set, so user-mode access is tested too. All passed in a Developer Edition org on 23 Nov 2026 (classes 87–100% covered). They plant every pattern, run the engine and check that each pointer type is found, that re-runs keep decisions and create no duplicates, the pointer lifecycle, the win room agenda, the AI parsing (mocked callout) and fallback, contract compliance and renewal pointers, the contract editor, the registry import, name matching and volume mapping (with fictitious registry rows), the tender feeds (mocked TED, Find a Tender and Public Contracts Scotland responses: CPV filter, cross-portal dedupe, EUR conversion, categories, buyer matching, preserved decisions, sources and schedule), the demo team and the My team scope, and adding / deleting custom rules.
+- **JavaScript:** `npm test` runs Jest on `winRoomUtils`, `winRoomSelect`, the registry CSV parser in `winRoomMarket`, the tender view, the guide and the page tours (25 tests). `npm run lint` runs ESLint.
 - **CI:** every push runs ESLint and Jest. To run the Apex tests too, add a repository secret `DEVHUB_SFDX_AUTH_URL` with the *Sfdx Auth Url* of a Dev Hub. The job then creates a one-day scratch org, deploys, runs the tests and deletes the org.
 
 ## Project structure
@@ -153,7 +160,7 @@ force-app/main/default/
   permissionsets/    Win_Room_User, Win_Room_Admin
   customPermissions/ Win_Room_Admin
   applications/ tabs/
-scripts/apex/        seed-demo-data.apex
+scripts/apex/        seed-demo-data.apex, create-demo-team.apex
 docs/                architecture, rules, presentation
 ```
 
