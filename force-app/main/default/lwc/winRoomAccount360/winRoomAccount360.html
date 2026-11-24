@@ -61,7 +61,7 @@
                 </div>
 
                 <template lwc:if={hasMarket}>
-                    <div class="wr-card">
+                    <div class="wr-card" data-tour="market">
                         <div class="wr-card-title">Market volume <span class="wr-card-sub">hip and knee procedures per month, national joint registry, as at {marketAsOf}</span></div>
                         <div class="market-sites">
                             <template for:each={marketSites} for:item="s">
@@ -72,7 +72,7 @@
                     </div>
                 </template>
 
-                <div class="wr-card">
+                <div class="wr-card" data-tour="contracts">
                     <div class="wr-card-title">Contracts <span class="wr-card-sub">committed vs delivered to date</span></div>
                     <template lwc:if={hasContracts}>
                         <table class="wr-table">
@@ -113,7 +113,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="wr-card">
+                    <div class="wr-card" data-tour="surgeons">
                         <div class="wr-card-title">Surgeons</div>
                         <table class="wr-table">
                             <thead><tr><th>Surgeon</th><th class="wr-num">Procedures / yr</th><th>Site</th><th>Contoso</th></tr></thead>
@@ -154,7 +154,7 @@
                         </template>
                         <template lwc:else><div class="wr-muted">No tenders.</div></template>
                     </div>
-                    <div class="wr-card">
+                    <div class="wr-card" data-tour="opps">
                         <div class="wr-card-title">Open opportunities</div>
                         <template lwc:if={hasOpps}>
                             <table class="wr-table">

@@ -330,6 +330,97 @@ export const SECTIONS = [
         ]
     },
     {
+        id: "setup",
+        title: "Setup, roles and routines",
+        lead: "What an admin sets up once, and the routines that keep the data fresh.",
+        blocks: [
+            { h: "Who can do what" },
+            {
+                table: {
+                    head: ["Role", "Permission set", "Can"],
+                    rows: [
+                        ["Rep / field user", "Win Room User", "See pointers, accounts, contracts, market and tenders they have access to; accept, reject and convert pointers; run win rooms and record commitments."],
+                        ["Manager", "Win Room User + Manager field on the reps", "Everything a rep can, plus the My team scope over their direct reports."],
+                        ["Admin", "Win Room Admin", "Rules (edit, new, delete custom), engine runs, demo data and demo team, account scope, contracts editor, registry import and matching, tender sources, sync and matching, tender status."]
+                    ]
+                }
+            },
+            { h: "Routines" },
+            {
+                table: {
+                    head: ["Routine", "How", "When"],
+                    rows: [
+                        ["Load sales", "Integration or data load into WR Sales (account x product line x month)", "Monthly, after month end"],
+                        ["Run the engine", "Rules & Data > Run engine now, or a scheduled batch", "After each sales load, or weekly"],
+                        ["Tender sync", "Tenders > Sync now, or Daily sync at 06:00", "Daily"],
+                        ["Registry volumes", "Market > Import NJR CSV, then check suggestions", "Monthly or quarterly"],
+                        ["Review rule performance", "Dashboard > Rule performance; tune rules below 40% acceptance", "Monthly"],
+                        ["Win room", "Win Room > plan the session of the week per team", "Weekly"]
+                    ]
+                }
+            },
+            { h: "First use checklist" },
+            {
+                steps: [
+                    "Assign the permission sets (Win Room User to reps, Win Room Admin to admins) and set the Manager field of the reps.",
+                    "Check the product lines and their average prices (Rules & Data > Product lines).",
+                    "Load sales and account profiles, or generate demo data in a sandbox.",
+                    "Set the account scope and rollout phase (Rules & Data > Data).",
+                    "Run the engine and check the run log (Rules & Data > Engine runs).",
+                    "Optional: import registry volumes, run a tender sync, configure the AI connection.",
+                    "Run the tour on each page with the team."
+                ]
+            }
+        ]
+    },
+    {
+        id: "datamodel",
+        title: "Data model",
+        lead: "Every object the Win Room uses. Account and Opportunity are standard; everything else is part of the module.",
+        blocks: [
+            {
+                table: {
+                    head: ["Object", "One record is", "Filled by"],
+                    rows: [
+                        ["WR Sales", "Units and revenue of one product line at one account in one month", "ERP load / demo generator"],
+                        ["WR Product Line", "A product family or component with its code, category and average price", "Admin"],
+                        ["WR Account Profile", "Win Room settings of an account: country, segment, size, procedures, phase, scope, rep", "Admin / demo generator / registry"],
+                        ["WR Surgeon, WR Affiliation", "A surgeon and the hospitals where they operate", "CRM / demo generator"],
+                        ["WR Rule", "A rule: type, thresholds, windows, weight, playbook", "Admin"],
+                        ["WR Run", "One engine run with its counts and errors", "Engine"],
+                        ["WR Pointer", "One opportunity at one account: value, score, rationale, evidence, decision, owner", "Engine, then reps"],
+                        ["WR Session, WR Commitment", "A weekly win room and the actions agreed in it or on a pointer", "Teams"],
+                        ["WR Contract, WR Contract Line", "A volume commitment and its units per month per product line", "Admin / contract load"],
+                        ["WR Market Site", "A registry hospital with its hip and knee volumes and linked account", "Registry import"],
+                        ["WR Tender, WR Tender Source", "A public notice with its buyer, value, deadline and linked account; the portals and their filters", "Tender sync / demo generator"],
+                        ["Opportunity", "Created from an accepted pointer, linked back to it", "Reps"]
+                    ]
+                }
+            }
+        ]
+    },
+    {
+        id: "troubleshooting",
+        title: "Troubleshooting",
+        blocks: [
+            {
+                table: {
+                    head: ["Symptom", "Cause and fix"],
+                    rows: [
+                        ["No pointers at all", "The engine has not run, or no account is in scope. Rules & Data > Data: check the scope, then Run engine now and look at Engine runs."],
+                        ["A pointer I expected is missing", "The rule is inactive, the value is below its minimum, the account is out of scope, or a more specific pointer exists for the same account and product line."],
+                        ["Too many irrelevant pointers of one rule", "Raise its threshold or minimum value, or lower its weight; check its acceptance rate on the dashboard."],
+                        ["My team shows the same as Mine", "Nobody has you as Manager. Set the Manager field of your reps (or create the demo team in a sandbox)."],
+                        ["A tour step says there is no data", "That block only appears with data (e.g. contracts or registry volumes for the account). The other steps still apply."],
+                        ["Tender sync shows an error", "The result column of the source has the message. Public Contracts Scotland fails TLS validation from Salesforce and stays inactive; other errors are usually temporary portal outages."],
+                        ["A tender is linked to the wrong account", "Admins unlink it and link the right account, or ignore it. Confirmed links are never changed by a sync."],
+                        ["Share of wallet looks wrong", "Check the procedures on the account profile (registry or estimate) and the average prices of the product lines."]
+                    ]
+                }
+            }
+        ]
+    },
+    {
         id: "faq",
         title: "Questions you may get",
         blocks: [

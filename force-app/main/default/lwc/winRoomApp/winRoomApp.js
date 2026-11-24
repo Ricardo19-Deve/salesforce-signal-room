@@ -1,7 +1,7 @@
 import { LightningElement, api } from "lwc";
 import getContext from "@salesforce/apex/WinRoomController.getContext";
 import { reduceErrors, formatDate, tourRect } from "c/winRoomUtils";
-import { TOURS } from "./tourContent";
+import { TOURS } from "c/winRoomTour";
 
 const VIEWS = [
     { view: "dashboard", label: "Dashboard", icon: "utility:home", subtitle: "Where the value is and how the field is acting on it" },
@@ -37,6 +37,9 @@ export default class WinRoomApp extends LightningElement {
     tourOn = false;
     tourIndex = 0;
     tourBox;
+    tourBusy = false;
+    tourDir = 1;
+    tourToken = 0;
     refreshKey = 0;
 
     connectedCallback() {
@@ -210,8 +213,11 @@ export default class WinRoomApp extends LightningElement {
     get tourNextLabel() {
         return this.tourIndex === this.tourSteps.length - 1 ? "Finish" : "Next";
     }
+    get tourPopClass() {
+        return this.tourBusy ? "tour-pop tour-pop_busy" : "tour-pop";
+    }
     get tourMissing() {
-        return !this.tourBox;
+        return !this.tourBox && !this.tourBusy;
     }
     get progressStyle() {
         return `width:${Math.round(((this.tourIndex + 1) / this.tourSteps.length) * 100)}%`;
@@ -248,6 +254,7 @@ export default class WinRoomApp extends LightningElement {
     startTour() {
         this.selectedPointerId = undefined;
         this.tourIndex = 0;
+        this.tourDir = 1;
         this.tourOn = true;
         this._onMove = () => this.measureTour(false);
         window.addEventListener("scroll", this._onMove, true);
@@ -257,6 +264,7 @@ export default class WinRoomApp extends LightningElement {
     endTour() {
         this.tourOn = false;
         this.tourBox = undefined;
+        this.tourToken = (this.tourToken || 0) + 1;
         window.removeEventListener("scroll", this._onMove, true);
         window.removeEventListener("resize", this._onMove);
     }
@@ -264,42 +272,94 @@ export default class WinRoomApp extends LightningElement {
         if (this.tourOn) this.endTour();
     }
     tourNext() {
+        if (this.tourBusy) return;
         if (this.tourIndex >= this.tourSteps.length - 1) {
             this.endTour();
             return;
         }
         this.tourIndex++;
+        this.tourDir = 1;
         this.showTourStep();
     }
     tourBack() {
-        if (this.tourIndex > 0) {
-            this.tourIndex--;
-            this.showTourStep();
-        }
+        if (this.tourBusy || this.tourIndex === 0) return;
+        this.tourIndex--;
+        this.tourDir = -1;
+        this.showTourStep();
     }
     handleTourKey(e) {
         if (e.key === "Escape") this.endTour();
         else if (e.key === "ArrowRight" || e.key === "Enter") this.tourNext();
         else if (e.key === "ArrowLeft") this.tourBack();
     }
-    showTourStep() {
-        this.measureTour(true);
+    /**
+     * Runs the step's action (open a record, switch tab...), then waits until its block is rendered: pages load
+     * their data asynchronously. Optional steps whose block never appears are skipped in the direction of travel.
+     */
+    async showTourStep() {
+        const token = (this.tourToken || 0) + 1;
+        this.tourToken = token;
+        const step = this.tourStep;
+        this.tourBusy = true;
+        try {
+            await this.runTourAction(step.action);
+        } catch (e) {
+            // an action that fails only means the block may not be on screen
+        }
+        let box = null;
+        const attempts = step.optional ? 10 : 24;
+        for (let attempt = 0; attempt < attempts && token === this.tourToken; attempt++) {
+            box = this.findTourBox(true);
+            if (box) break;
+            // eslint-disable-next-line no-await-in-loop
+            await this.tourWait(attempt < 4 ? 80 : 150);
+        }
+        if (token !== this.tourToken) return;
+        this.tourBusy = false;
+        if (!box && step.optional) {
+            const next = this.tourIndex + this.tourDir;
+            if (next >= 0 && next < this.tourSteps.length) {
+                this.tourIndex = next;
+                this.showTourStep();
+                return;
+            }
+        }
+        this.tourBox = box;
         // eslint-disable-next-line @lwc/lwc/no-async-operation
         window.requestAnimationFrame(() => {
             this.measureTour(false);
-            const next = this.template.querySelector(".tour-next");
-            if (next) next.focus();
+            const nextBtn = this.template.querySelector(".tour-next");
+            if (nextBtn) nextBtn.focus();
         });
     }
-    measureTour(scroll) {
-        if (!this.tourOn) return;
+    tourWait(ms) {
+        // eslint-disable-next-line @lwc/lwc/no-async-operation
+        return new Promise((resolve) => window.setTimeout(resolve, ms));
+    }
+    async runTourAction(action) {
+        if (!action) return;
+        if (action === "close-drawer") {
+            this.selectedPointerId = undefined;
+            return;
+        }
+        const host = this.template.querySelector("[data-tour-host]");
+        if (host && host.tourAction) await host.tourAction(action);
+    }
+    findTourBox(scroll) {
         const target = this.tourStep.target || "";
         if (target.startsWith("page:")) {
             const host = this.template.querySelector("[data-tour-host]");
-            this.tourBox = host && host.tourRect ? host.tourRect(target.slice(5), scroll) : null;
-        } else {
-            this.tourBox = tourRect(this.template, `[data-tour="${target}"]`, scroll);
+            return host && host.tourRect ? host.tourRect(target.slice(5), scroll) : null;
         }
+        if (target.startsWith("drawer:")) {
+            const drawer = this.template.querySelector("c-win-room-pointer-detail");
+            return drawer && drawer.tourRect ? drawer.tourRect(target.slice(7), scroll) : null;
+        }
+        return tourRect(this.template, `[data-tour="${target}"]`, scroll);
+    }
+    measureTour(scroll) {
+        if (!this.tourOn || this.tourBusy) return;
+        this.tourBox = this.findTourBox(scroll);
     }
     openGuide() {
         this.guideSection = "overview";

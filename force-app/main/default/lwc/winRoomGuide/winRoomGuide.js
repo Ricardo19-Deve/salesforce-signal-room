@@ -2,6 +2,7 @@ import { LightningElement, api } from "lwc";
 import getRules from "@salesforce/apex/WinRoomController.getRules";
 import { money } from "c/winRoomUtils";
 import { SECTIONS } from "./guideContent";
+import { TOURS } from "c/winRoomTour";
 
 /**
  * In-portal guide: what every page shows, where the data comes from and how each number is calculated.
@@ -40,7 +41,19 @@ export default class WinRoomGuide extends LightningElement {
     }
     get sectionData() {
         const index = SECTIONS.findIndex((s) => s.id === this.current);
-        const s = SECTIONS[index];
+        const base = SECTIONS[index];
+        const tour = base.view ? (TOURS[base.view] || []).filter((t) => t.target !== "guide") : [];
+        // Pages also get the tour steps as a "block by block" reference, so the guide and the tour say the same.
+        const s = tour.length
+            ? {
+                  ...base,
+                  blocks: [
+                      ...base.blocks,
+                      { h: "Block by block" },
+                      { table: { head: ["Block", "What it shows and how it is calculated", "Data"], rows: tour.map((t) => [t.title, t.body, t.data || "–"]) } }
+                  ]
+              }
+            : base;
         return {
             ...s,
             num: String(index + 1).padStart(2, "0"),

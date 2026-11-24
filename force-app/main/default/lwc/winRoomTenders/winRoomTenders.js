@@ -30,6 +30,15 @@ export default class WinRoomTenders extends LightningElement {
         return tourRect(this.template, selector, scroll);
     }
 
+    /** Tour support: expands the first tender. */
+    @api
+    tourAction(action) {
+        const first = this.rows[0];
+        if (action === "expand-first" && first && !this.expanded[first.id]) {
+            this.expanded = { ...this.expanded, [first.id]: true };
+        }
+    }
+
     @api isAdmin = false;
 
     data;
