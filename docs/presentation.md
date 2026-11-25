@@ -2,6 +2,8 @@
 
 **One line.** A signal room inside Salesforce: rules find customer-level opportunities in sales data, reps act on them with the evidence in front of them, and a weekly rhythm turns them into commitments.
 
+*The concept is an established sales-excellence practice, not my invention; this is my own implementation of it, built entirely in Salesforce.*
+
 ## The problem (1 minute)
 
 - Opportunities are spotted late, or not at all: a hospital slowly moves one component to a competitor, a surgeon who loves the product starts operating somewhere else, a tender deadline slips past.
