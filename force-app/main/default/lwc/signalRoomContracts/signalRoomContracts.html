@@ -1,0 +1,193 @@
+<template>
+    <template lwc:if={error}>
+        <div class="sr-alert sr-alert_error" role="alert">{error}</div>
+    </template>
+    <div class="wrap">
+        <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+
+        <!-- ============================================================ list -->
+        <template lwc:if={showList}>
+            <div class="sr-grid sr-grid_5">
+                <template for:each={kpis} for:item="k">
+                    <div key={k.key} class="sr-card sr-kpi">
+                        <div class="sr-kpi-label">{k.label}</div>
+                        <div class={k.cls}>{k.value}</div>
+                        <div class="sr-kpi-hint">{k.hint}</div>
+                    </div>
+                </template>
+            </div>
+            <div class="sr-card section">
+                <div class="sr-toolbar">
+                    <label class="sr-search">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                        <input type="search" placeholder="Search contract, reference or account" oninput={handleSearch} />
+                    </label>
+                    <c-signal-room-select label="Health" value={health} options={healthOptions} onchange={handleHealth}></c-signal-room-select>
+                    <span class="spacer"></span>
+                    <template lwc:if={isAdmin}>
+                        <button type="button" class="sr-btn sr-btn_primary" onclick={newContract}><lightning-icon icon-name="utility:add" size="xx-small" class="sr-btn-icon"></lightning-icon>New contract</button>
+                    </template>
+                </div>
+                <template lwc:if={hasContracts}>
+                    <div class="scroll">
+                        <table class="sr-table">
+                            <thead>
+                                <tr>
+                                    <th>Contract</th><th>Account</th><th>Term</th><th>Health</th><th class="sr-num">Delivered vs committed</th>
+                                    <th class="sr-num">Variance to date</th><th class="sr-num">Annual value</th><th>Ends</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={contracts} for:item="c">
+                                    <tr key={c.contractId} class="sr-click" data-id={c.contractId} onclick={open}>
+                                        <td><div class="sr-strong">{c.name}</div><div class="sr-faint">{c.reference} · {c.lineCount}</div></td>
+                                        <td><span class="sr-link" data-id={c.accountId} onclick={openAccount}>{c.accountName}</span></td>
+                                        <td>
+                                            <div class="sr-muted nowrap">{c.term}</div>
+                                            <div class="progress"><div class="progress-fill" style={c.progressStyle}></div></div>
+                                            <div class="sr-faint">{c.progressText}</div>
+                                        </td>
+                                        <td><span class={c.healthClass}>{c.health}</span></td>
+                                        <td class="sr-num sr-strong">{c.complianceText}</td>
+                                        <td class={c.varianceClass}>{c.varianceText}</td>
+                                        <td class="sr-num">{c.annualText}</td>
+                                        <td><span class={c.endsClass}>{c.endsText}</span></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+                <template lwc:else><div class="sr-empty">No contracts for this filter.</div></template>
+            </div>
+        </template>
+
+        <!-- ============================================================ detail -->
+        <template lwc:if={showDetail}>
+            <div class="sr-card">
+                <div class="detail-head">
+                    <button type="button" class="sr-icon-btn" title="Back" aria-label="Back to contracts" onclick={back}><lightning-icon icon-name="utility:back" size="x-small"></lightning-icon></button>
+                    <div class="grow">
+                        <div class="title">{c.name} <span class={detailHealthClass}>{c.health}</span></div>
+                        <div class="sr-muted">
+                            <span class="sr-link" data-id={c.accountId} onclick={openAccount}>{c.accountName}</span>
+                            · {c.reference} · {c.recordStatus} · compared from {comparedFromText}
+                        </div>
+                    </div>
+                    <template lwc:if={isAdmin}>
+                        <button type="button" class="sr-btn" onclick={editContract}><lightning-icon icon-name="utility:edit" size="xx-small" class="sr-btn-icon"></lightning-icon>Edit</button>
+                        <button type="button" class="sr-btn sr-btn_danger-text" onclick={remove}>Delete</button>
+                    </template>
+                </div>
+                <div class="sr-grid sr-grid_4 kpis">
+                    <template for:each={detailKpis} for:item="k">
+                        <div key={k.key}>
+                            <div class="sr-kpi-label">{k.label}</div>
+                            <div class="kpi-value">{k.value}</div>
+                            <div class="sr-kpi-hint">{k.hint}</div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <template for:each={detailLines} for:item="l">
+                <div key={l.lineId} class="sr-card section">
+                    <div class="sr-card-title">{l.label} <span class="sr-card-sub">{l.productLine}</span> <span class={l.healthClass}>{l.status}</span></div>
+                    <div class="facts">
+                        <template for:each={l.facts} for:item="f">
+                            <div key={f.key} class="fact"><div class="sr-kpi-label">{f.label}</div><div class="sr-strong">{f.value}</div></div>
+                        </template>
+                    </div>
+                    <template lwc:if={l.hasMonths}>
+                        <div class="line-body">
+                            <div class="chart">
+                                <c-signal-room-line-chart months={l.months} series={l.series} unit="units" heading="Committed vs delivered units"></c-signal-room-line-chart>
+                            </div>
+                            <div class="months">
+                                <table class="sr-table">
+                                    <thead><tr><th>Month</th><th class="sr-num">Committed</th><th class="sr-num">Delivered</th><th class="sr-num">Variance</th><th class="sr-num">Cumulative</th></tr></thead>
+                                    <tbody>
+                                        <template for:each={l.monthRows} for:item="m">
+                                            <tr key={m.key}>
+                                                <td>{m.month}</td>
+                                                <td class="sr-num">{m.committed}</td>
+                                                <td class="sr-num sr-strong">{m.delivered}</td>
+                                                <td class={m.varianceClass}>{m.variance}</td>
+                                                <td class={m.cumulativeClass}>{m.cumulative}</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </template>
+                    <template lwc:else><div class="sr-empty">No delivery data in the contract period yet.</div></template>
+                </div>
+            </template>
+
+            <div class="sr-card section" data-tour="cpointers">
+                <div class="sr-card-title">Pointers on this contract</div>
+                <template lwc:if={hasPointers}>
+                    <table class="sr-table">
+                        <tbody>
+                            <template for:each={pointers} for:item="p">
+                                <tr key={p.id} class="sr-click" data-id={p.id} onclick={openPointer}>
+                                    <td><span class={p.priorityClass}>{p.priority}</span></td>
+                                    <td class="sr-strong">{p.title}<div class="sr-faint">{p.rule}</div></td>
+                                    <td class="sr-num sr-strong">{p.valueText}</td>
+                                    <td><span class={p.statusClass}>{p.status}</span></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </template>
+                <template lwc:else><div class="sr-faint">No open pointers. The engine creates one when a line is under or over the commitment beyond tolerance, or when the contract ends within 6 months.</div></template>
+            </div>
+        </template>
+
+        <!-- ============================================================ editor -->
+        <template lwc:if={editing}>
+            <div class="sr-card editor">
+                <div class="sr-card-title">Contract</div>
+                <div class="sr-grid sr-grid_3">
+                    <label class="sr-field account-field">
+                        <span class="sr-field-label">Account</span>
+                        <input class="sr-input" type="text" value={editing.accountName} placeholder="Search account" oninput={searchAccount} />
+                        <template lwc:if={hasAccountResults}>
+                            <div class="results">
+                                <template for:each={accountResults} for:item="a">
+                                    <div key={a.id} class="result" data-id={a.id} data-name={a.name} onclick={pickAccount}>{a.name}<span class="sr-faint"> {a.city} {a.country}</span></div>
+                                </template>
+                            </div>
+                        </template>
+                    </label>
+                    <label class="sr-field"><span class="sr-field-label">Contract name</span><input class="sr-input" type="text" value={editing.name} data-field="name" oninput={handleField} /></label>
+                    <label class="sr-field"><span class="sr-field-label">Reference</span><input class="sr-input" type="text" value={editing.reference} data-field="reference" oninput={handleField} /></label>
+                    <label class="sr-field"><span class="sr-field-label">Start date</span><input class="sr-input" type="date" value={editing.startDate} data-field="startDate" onchange={handleField} /></label>
+                    <label class="sr-field"><span class="sr-field-label">End date</span><input class="sr-input" type="date" value={editing.endDate} data-field="endDate" onchange={handleField} /></label>
+                    <div class="two">
+                        <c-signal-room-select variant="field" label="Status" value={editing.status} options={statusOptions} data-field="status" onchange={handleField}></c-signal-room-select>
+                        <label class="sr-field"><span class="sr-field-label">Tolerance %</span><input class="sr-input" type="number" min="0" max="100" value={editing.tolerance} data-field="tolerance" oninput={handleField} /></label>
+                    </div>
+                </div>
+                <label class="sr-field notes"><span class="sr-field-label">Notes</span><textarea class="sr-input sr-textarea" value={editing.notes} data-field="notes" oninput={handleField}></textarea></label>
+
+                <div class="sr-card-title lines-title">Committed volumes <span class="sr-card-sub">units per month and product line, e.g. 10 cups per month = 10 hips</span></div>
+                <template for:each={editLines} for:item="l">
+                    <div key={l.key} class="line-row">
+                        <c-signal-room-select class="pl" variant="field" label="Product line" placeholder="Select a product line" value={l.productLineId} options={productLineOptions} data-index={l.index} data-field="productLineId" onchange={handleLine}></c-signal-room-select>
+                        <label class="sr-field grow"><span class="sr-field-label">Label</span><input class="sr-input" type="text" value={l.label} data-index={l.index} data-field="label" oninput={handleLine} /></label>
+                        <label class="sr-field qty"><span class="sr-field-label">Units / month</span><input class="sr-input" type="number" min="0" value={l.monthlyQty} data-index={l.index} data-field="monthlyQty" oninput={handleLine} /></label>
+                        <label class="sr-field qty"><span class="sr-field-label">Unit price (EUR)</span><input class="sr-input" type="number" min="0" step="0.01" value={l.unitPrice} data-index={l.index} data-field="unitPrice" oninput={handleLine} /></label>
+                        <button type="button" class="sr-icon-btn remove" title="Remove line" aria-label="Remove line" data-index={l.index} onclick={removeLine}><lightning-icon icon-name="utility:delete" size="x-small"></lightning-icon></button>
+                    </div>
+                </template>
+                <button type="button" class="sr-btn" onclick={addLine}><lightning-icon icon-name="utility:add" size="xx-small" class="sr-btn-icon"></lightning-icon>Add line</button>
+                <div class="form-actions">
+                    <button type="button" class="sr-btn" onclick={cancelEdit}>Cancel</button>
+                    <button type="button" class="sr-btn sr-btn_primary" onclick={save} disabled={busy}>Save contract</button>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

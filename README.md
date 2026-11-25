@@ -1,6 +1,6 @@
-# Salesforce Win Room
+# Salesforce Signal Room
 
-A **win room** for field sales, built natively on Salesforce with Apex and Lightning Web Components. A rules engine reads monthly sell-in and finds **customer-level opportunities** ("pointers"). Reps review them with the numbers behind each one and an optional AI summary, then accept, reject or turn them into Opportunities. A **weekly win room** asks the same 7 questions every 7 days, so the opportunities turn into committed actions. **Contracts** track committed volumes against what was delivered, a **market** view shows hospital procedure volumes from a public registry, and a **tender radar** reads real public tenders from the official EU and UK procurement APIs. A built-in **guide** explains every page, where its data comes from and how each number is calculated, and an interactive **tour** on every page highlights each block and explains it, for demos and onboarding.
+A **signal room** for field sales, built natively on Salesforce with Apex and Lightning Web Components. A rules engine reads monthly sell-in and finds **customer-level opportunities** ("pointers"). Reps review them with the numbers behind each one and an optional AI summary, then accept, reject or turn them into Opportunities. A **weekly signal room** asks the same 7 questions every 7 days, so the opportunities turn into committed actions. **Contracts** track committed volumes against what was delivered, a **market** view shows hospital procedure volumes from a public registry, and a **tender radar** reads real public tenders from the official EU and UK procurement APIs. A built-in **guide** explains every page, where its data comes from and how each number is calculated, and an interactive **tour** on every page highlights each block and explains it, for demos and onboarding.
 
 This is a neutral open-source reference with fictitious data. The demo domain is orthopaedic implants (knees, hips, surgical robots) sold to hospitals, but the engine, the data model and the portal are generic. The only real data is optional and public: the UK National Joint Registry procedure volumes, which you download yourself, and public tender notices, which the org reads from the official APIs. Neither is included in the repository.
 
@@ -10,8 +10,8 @@ This is a neutral open-source reference with fictitious data. The demo domain is
 | **Explainable pointers** | Every pointer stores the facts that triggered it, a monthly chart and a plain-language rationale. Value at stake and a 0–100 priority score (value, rule weight, urgency) rank the work. There is **one pointer per customer × product**, and a specific signal always beats the generic peer comparison. |
 | **Safe re-runs** | Pointers are matched on a signature. Re-running the engine updates the numbers but **never overwrites a rep's decision**, and undecided pointers that are no longer detected expire. |
 | **Activation** | Accept, reject with a reason (the dashboard shows the acceptance rate per rule, a feedback loop for tuning), or create an Opportunity in the org's first open stage, linked to the pointer. |
-| **AI "why and what"** | Optional. An OpenAI-compatible model, reached through a **Named Credential** (`Win_Room_LLM`), writes the why, the what, next best actions, talking points, discovery questions and risks, plus a briefing for the win room facilitator. Without it, a rule-based summary is shown, so nothing breaks. |
-| **Weekly win room** | Sessions per team, with the 7 questions: wins and losses, new pointers, accepted pointers without action, overdue commitments, stuck opportunities, tenders closing soon, and commitments for next week. |
+| **AI "why and what"** | Optional. An OpenAI-compatible model, reached through a **Named Credential** (`Signal_Room_LLM`), writes the why, the what, next best actions, talking points, discovery questions and risks, plus a briefing for the signal room facilitator. Without it, a rule-based summary is shown, so nothing breaks. |
+| **Weekly signal room** | Sessions per team, with the 7 questions: wins and losses, new pointers, accepted pointers without action, overdue commitments, stuck opportunities, tenders closing soon, and commitments for next week. |
 | **Contracts** | Volume commitments per account and product line (e.g. *10 cups per month for 3 years*). Committed vs delivered month by month, cumulative variance, 6-month run-rate, projection at term end and a status (On track / Under / Over against a tolerance). Under-delivery becomes a win-back pointer, over-delivery a renegotiation pointer, and contracts ending within 6 months a renewal pointer. |
 | **Market (public registry)** | Upload the public CSV export of the UK **National Joint Registry** (NJR StatsOnline): the browser keeps the last 24 complete months and stores one record per hospital with its hip / knee volumes and trend. Hospitals are matched to Accounts by hospital or trust name (suggestions need a distinctive shared word; admins confirm). Mapped accounts use the real volumes for share of wallet and peer sizing. No scraping and no callout. |
 | **Public tenders** | A sync reads **TED** (EU / EEA, Search API v3), **Find a Tender** (UK, OCDS) and **Public Contracts Scotland** (OCDS), anonymously and within the portals' fair-use limits. Notices are filtered by CPV prefix (default: orthopaedic implants and fracture fixation), normalised (title, buyer, country, earliest open deadline, lots summed, value converted to EUR, link to the official notice), categorised from multilingual keywords and de-duplicated across portals. Buyers are matched to Accounts of the same country (accents and noise words removed in several languages, each part of the name scored, automatic links need two agreeing words). Linked open tenders feed the tender radar rule; human statuses and links survive every sync. Runs on demand or daily. |
@@ -30,7 +30,7 @@ Captured in a Developer Edition org with the demo data (fictitious hospitals, su
 | ![Dashboard](docs/images/01-dashboard.png) Dashboard: value at stake, the four categories, value by country and type, top 10 | ![Filters](docs/images/02-filters.png) Scope switch and country filter |
 | ![Pointers](docs/images/03-pointers.png) Pointers: search, filters, priority score, due dates | ![Pointer](docs/images/05-pointer-insight.png) Pointer: rationale, facts, monthly chart, AI insight, playbook, commitments |
 | ![Create opportunity](docs/images/06-create-opportunity.png) Create an Opportunity from an accepted pointer | ![Account 360](docs/images/07-account-360.png) Account 360: revenue trend, pointers by category, product lines, surgeons |
-| ![Win room](docs/images/08-win-room.png) Weekly win room: same 7 questions every 7 days | ![Rules](docs/images/09-rules.png) Rules: thresholds, windows, product lines, playbooks |
+| ![Signal room](docs/images/08-signal-room.png) Weekly signal room: same 7 questions every 7 days | ![Rules](docs/images/09-rules.png) Rules: thresholds, windows, product lines, playbooks |
 | ![Data](docs/images/10-data.png) Data: demo data, purge and account scope by rollout phase | ![Contracts](docs/images/11-contracts.png) Contracts: health, delivered vs committed, variance, renewals |
 | ![Contract](docs/images/12-contract-detail.png) Contract: committed vs delivered per month, run-rate and projection per line | ![Contract pointer](docs/images/14-contract-pointer.png) Contract shortfall pointer with the delivery chart |
 | ![Market](docs/images/13-market.png) Market: public NJR hospital volumes (NHS file). The demo accounts are fictitious, so the hospitals stay unlinked | ![Tenders](docs/images/15-tenders.png) Tenders: real open notices from TED and Find a Tender, sources and filters, matched to accounts |
@@ -46,69 +46,69 @@ Captured in a Developer Edition org with the demo data (fictitious hospitals, su
 ```mermaid
 flowchart LR
     subgraph Data
-        S[(WR_Sales__c<br/>account x product line x month)]
-        P[(WR_Account_Profile__c<br/>segment, procedures, phase)]
-        A[(WR_Affiliation__c<br/>surgeon x hospital)]
-        T[(WR_Tender__c)]
-        R[(WR_Rule__c)]
-        K[(WR_Contract__c<br/>+ lines)]
-        M[(WR_Market_Site__c<br/>registry volumes)]
+        S[(SR_Sales__c<br/>account x product line x month)]
+        P[(SR_Account_Profile__c<br/>segment, procedures, phase)]
+        A[(SR_Affiliation__c<br/>surgeon x hospital)]
+        T[(SR_Tender__c)]
+        R[(SR_Rule__c)]
+        K[(SR_Contract__c<br/>+ lines)]
+        M[(SR_Market_Site__c<br/>registry volumes)]
     end
     subgraph Public[Public APIs]
         TED[TED Search API]
         FTS[Find a Tender OCDS]
         PCS[Public Contracts Scotland OCDS]
     end
-    TED & FTS & PCS --> TS[WinRoomTenderSync<br/>CPV filter, dedupe, matching] --> T
+    TED & FTS & PCS --> TS[SignalRoomTenderSync<br/>CPV filter, dedupe, matching] --> T
     subgraph Engine
-        B[WinRoomBenchmarkBatch<br/>peer benchmarks]
-        E[WinRoomEngineBatch]
-        W[WinRoomEngine<br/>rules, scoring, dedupe]
+        B[SignalRoomBenchmarkBatch<br/>peer benchmarks]
+        E[SignalRoomEngineBatch]
+        W[SignalRoomEngine<br/>rules, scoring, dedupe]
     end
     subgraph Portal[Lightning Web Components]
         D[Dashboard]
         PT[Pointers + detail]
         AC[Account 360]
-        WR[Win room]
+        SR[Signal room]
         AD[Rules & Data]
     end
     S & P --> B --> E --> W
     S & A & T & R & K --> W
     M -->|mapped volumes| P
-    W --> PO[(WR_Pointer__c)]
-    PO --> D & PT & AC & WR
+    W --> PO[(SR_Pointer__c)]
+    PO --> D & PT & AC & SR
     PT -->|accept / reject / convert| PO
     PT -->|create| O[(Opportunity)]
-    WR --> C[(WR_Commitment__c)]
-    PT -. optional .-> AI[WinRoomAIService<br/>Named Credential]
+    SR --> C[(SR_Commitment__c)]
+    PT -. optional .-> AI[SignalRoomAIService<br/>Named Credential]
     AD --> R
 ```
 
 1. **Identify.** The engine compares each in-scope account with its own history and with peer hospitals of the same segment, and writes pointers with value at stake, priority and evidence.
 2. **Activate.** Reps review pointers in the portal (or in an activation workshop), accept or reject them and create Opportunities.
-3. **Execute.** The weekly win room reviews progress with the 7 questions and records commitments with an owner and a due date.
+3. **Execute.** The weekly signal room reviews progress with the 7 questions and records commitments with an owner and a due date.
 
 More detail is in [docs/architecture.md](docs/architecture.md) and [docs/rules.md](docs/rules.md).
 
 ## Install in a Developer Edition org
 
 ```bash
-sf org login web -a win-room
-sf project deploy start -o win-room -d force-app -l RunSpecifiedTests -t WinRoomTest
-sf org assign permset -o win-room -n Win_Room_Admin
-sf apex run -o win-room -f scripts/apex/seed-demo-data.apex
+sf org login web -a signal-room
+sf project deploy start -o signal-room -d force-app -l RunSpecifiedTests -t SignalRoomTest
+sf org assign permset -o signal-room -n Signal_Room_Admin
+sf apex run -o signal-room -f scripts/apex/seed-demo-data.apex
 # optional: six fictitious reps reporting to you, then regenerate in Rules & Data > Data
-sf apex run -o win-room -f scripts/apex/create-demo-team.apex
+sf apex run -o signal-room -f scripts/apex/create-demo-team.apex
 ```
 
-Open the **Win Room** app. The seed creates 10 fictitious hospitals and runs the engine; pointers appear after 1–2 minutes (the header shows the engine status).
+Open the **Signal Room** app. The seed creates 10 fictitious hospitals and runs the engine; pointers appear after 1–2 minutes (the header shows the engine status).
 
-- **Reps** get `Win_Room_User` (review pointers, decide, run win rooms). **Admins** get `Win_Room_Admin` (rules, engine runs, demo data, scope).
+- **Reps** get `Signal_Room_User` (review pointers, decide, run signal rooms). **Admins** get `Signal_Room_Admin` (rules, engine runs, demo data, scope).
 - **Storage.** A Developer Edition org has 5 MB of data. The demo generator detects it and switches to compact mode (18 months of history, about 2,000 sales rows). Other orgs get 24 months.
-- **AI (optional).** Create an External Credential with your API key and a Named Credential called `Win_Room_LLM` pointing at an OpenAI-compatible API (for example `https://api.openai.com`), and give users access to the principal. No key is stored in this repository.
+- **AI (optional).** Create an External Credential with your API key and a Named Credential called `Signal_Room_LLM` pointing at an OpenAI-compatible API (for example `https://api.openai.com`), and give users access to the principal. No key is stored in this repository.
 - **Market (optional, public data).** Download *Download all NJR statistics* (NHS and/or Independent Sector CSV) from [NJR StatsOnline](https://surgeonprofile.njrcentre.org.uk/Home/StatsIndex) and use **Market → Import NJR CSV**. The data is © NJR; check its terms before any commercial use. In a Developer Edition org the NHS file alone (about 260 hospitals) fits in the 5 MB of storage next to the demo data.
 - **Tenders (optional, public data).** The deploy adds Remote Site Settings for the three APIs. Open **Tenders → Sync now** (admins); the first sync reads the last 30 days of TED and 180 days of Find a Tender, later syncs continue from the last run. *Daily sync at 06:00* schedules it. Public Contracts Scotland is inactive by default: its API currently sends an incomplete TLS certificate chain, which Salesforce refuses; Scottish notices above the threshold still arrive through Find a Tender. TED content is reusable with attribution (Publications Office of the EU); Find a Tender and Public Contracts Scotland are under the Open Government Licence v3.0.
-- **Portal.** Add the `winRoomApp` component to an LWR Experience Cloud page and set *Full screen* to show it as a standalone portal.
+- **Portal.** Add the `signalRoomApp` component to an LWR Experience Cloud page and set *Full screen* to show it as a standalone portal.
 
 ## Demo script (10 minutes)
 
@@ -118,12 +118,12 @@ Open the **Win Room** app. The seed creates 10 fictitious hospitals and runs the
    - **Generate AI insight** adds the why, the what, next best actions, questions and risks.
    - **Accept**, then **Create opportunity**: the Opportunity is linked to the pointer.
 3. **Account 360.** Open **Northgate General Hospital** to see soft churn on the knee lines, a surgeon to hunt, a tender closing soon and white space vs. peers.
-4. **Win room.** Team **GB**, planned session.
+4. **Signal room.** Team **GB**, planned session.
    - Walk through the 7 questions and add a commitment with an owner and a due date.
    - **AI briefing** prepares the facilitator.
 5. **Contracts.** Open **Knee system agreement - St Aldric University Hospital**.
    - Femoral components are on track; tibial trays run at about half of the commitment, so the contract is *Under* and the projection ends far below the term commitment.
-   - The *Contract shortfall* pointer carries the same chart into the pointer list and the win room.
+   - The *Contract shortfall* pointer carries the same chart into the pointer list and the signal room.
    - Show the *Over* contract (renegotiate the tier) and the one ending within 6 months (renewal).
 6. **Market.** With the NJR file imported, sort by volume: every hospital with its hip and knee procedures, trend and market value; link a hospital to an account to switch its profile to real volumes.
 7. **Tenders.** Real open notices from the public portals: show the sources and their CPV filter, expand a notice (value in its currency and in EUR, link to the official notice) and filter *Account: Linked* to see the tenders that feed the tender radar pointers.
@@ -138,29 +138,29 @@ Reset before a demo: **Rules & Data → Data → Purge demo data**, then **Gener
 
 ## Tests
 
-- **Apex:** 20 tests in `WinRoomTest`, run as a user with the `Win_Room_Admin` permission set, so user-mode access is tested too. All passed in a Developer Edition org on 23 Nov 2026 (classes 87–100% covered). They plant every pattern, run the engine and check that each pointer type is found, that re-runs keep decisions and create no duplicates, the pointer lifecycle, the win room agenda, the AI parsing (mocked callout) and fallback, contract compliance and renewal pointers, the contract editor, the registry import, name matching and volume mapping (with fictitious registry rows), the tender feeds (mocked TED, Find a Tender and Public Contracts Scotland responses: CPV filter, cross-portal dedupe, EUR conversion, categories, buyer matching, preserved decisions, sources and schedule), the demo team and the My team scope, and adding / deleting custom rules.
-- **JavaScript:** `npm test` runs Jest on `winRoomUtils`, `winRoomSelect`, the registry CSV parser in `winRoomMarket`, the tender view, the guide and the page tours (25 tests). `npm run lint` runs ESLint.
+- **Apex:** 20 tests in `SignalRoomTest`, run as a user with the `Signal_Room_Admin` permission set, so user-mode access is tested too. All passed in a Developer Edition org on 23 Nov 2026 (classes 87–100% covered). They plant every pattern, run the engine and check that each pointer type is found, that re-runs keep decisions and create no duplicates, the pointer lifecycle, the signal room agenda, the AI parsing (mocked callout) and fallback, contract compliance and renewal pointers, the contract editor, the registry import, name matching and volume mapping (with fictitious registry rows), the tender feeds (mocked TED, Find a Tender and Public Contracts Scotland responses: CPV filter, cross-portal dedupe, EUR conversion, categories, buyer matching, preserved decisions, sources and schedule), the demo team and the My team scope, and adding / deleting custom rules.
+- **JavaScript:** `npm test` runs Jest on `signalRoomUtils`, `signalRoomSelect`, the registry CSV parser in `signalRoomMarket`, the tender view, the guide and the page tours (25 tests). `npm run lint` runs ESLint.
 - **CI:** every push runs ESLint and Jest. To run the Apex tests too, add a repository secret `DEVHUB_SFDX_AUTH_URL` with the *Sfdx Auth Url* of a Dev Hub. The job then creates a one-day scratch org, deploys, runs the tests and deletes the org.
 
 ## Project structure
 
 ```
 force-app/main/default/
-  classes/           WinRoomEngine (rules, scoring), WinRoomBenchmarkBatch, WinRoomEngineBatch,
-                     WinRoomRules (defaults), WinRoomController (portal API), WinRoomAIService,
-                     WinRoomContracts (compliance), WinRoomMarket (registry import and matching),
-                     WinRoomTenders (feeds, parsing, matching) + WinRoomTenderSync (batch, schedule),
-                     WinRoomMockData + WinRoomMockDataBatch (demo data), WinRoomTest
-  lwc/               winRoomApp (shell) and the views: winRoomDashboard, winRoomPointers,
-                     winRoomPointerDetail, winRoomAccount360, winRoomSession, winRoomContracts, winRoomMarket,
-                     winRoomTenders, winRoomAdmin, winRoomGuide (content in guideContent.js);
-                     shared: winRoomSelect, winRoomSegmented, winRoomLineChart, winRoomUtils, winRoomStyles
-  objects/           WR_Sales__c, WR_Product_Line__c, WR_Account_Profile__c, WR_Surgeon__c, WR_Affiliation__c,
-                     WR_Tender__c, WR_Rule__c, WR_Run__c, WR_Pointer__c, WR_Session__c, WR_Commitment__c,
-                     WR_Contract__c, WR_Contract_Line__c, WR_Market_Site__c, WR_Tender_Source__c
+  classes/           SignalRoomEngine (rules, scoring), SignalRoomBenchmarkBatch, SignalRoomEngineBatch,
+                     SignalRoomRules (defaults), SignalRoomController (portal API), SignalRoomAIService,
+                     SignalRoomContracts (compliance), SignalRoomMarket (registry import and matching),
+                     SignalRoomTenders (feeds, parsing, matching) + SignalRoomTenderSync (batch, schedule),
+                     SignalRoomMockData + SignalRoomMockDataBatch (demo data), SignalRoomTest
+  lwc/               signalRoomApp (shell) and the views: signalRoomDashboard, signalRoomPointers,
+                     signalRoomPointerDetail, signalRoomAccount360, signalRoomSession, signalRoomContracts, signalRoomMarket,
+                     signalRoomTenders, signalRoomAdmin, signalRoomGuide (content in guideContent.js);
+                     shared: signalRoomSelect, signalRoomSegmented, signalRoomLineChart, signalRoomUtils, signalRoomStyles
+  objects/           SR_Sales__c, SR_Product_Line__c, SR_Account_Profile__c, SR_Surgeon__c, SR_Affiliation__c,
+                     SR_Tender__c, SR_Rule__c, SR_Run__c, SR_Pointer__c, SR_Session__c, SR_Commitment__c,
+                     SR_Contract__c, SR_Contract_Line__c, SR_Market_Site__c, SR_Tender_Source__c
   remoteSiteSettings/ TED, Find a Tender, Public Contracts Scotland
-  permissionsets/    Win_Room_User, Win_Room_Admin
-  customPermissions/ Win_Room_Admin
+  permissionsets/    Signal_Room_User, Signal_Room_Admin
+  customPermissions/ Signal_Room_Admin
   applications/ tabs/
 scripts/apex/        seed-demo-data.apex, create-demo-team.apex
 docs/                architecture, rules, presentation

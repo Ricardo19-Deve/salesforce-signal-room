@@ -1,8 +1,8 @@
 {
-  "name": "salesforce-win-room",
+  "name": "salesforce-signal-room",
   "private": true,
   "version": "1.0.0",
-  "description": "Opportunity identification and weekly win room for field sales (Apex + LWC)",
+  "description": "Opportunity identification and weekly signal room for field sales (Apex + LWC)",
   "license": "MIT",
   "scripts": {
     "lint": "eslint force-app/main/default/lwc",

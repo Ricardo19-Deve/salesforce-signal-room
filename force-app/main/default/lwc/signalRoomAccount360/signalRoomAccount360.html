@@ -1,0 +1,182 @@
+<template>
+    <div class="layout">
+        <div class="sr-card side">
+            <label class="sr-search">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                <input type="search" placeholder="Find hospital" oninput={handleSearch} />
+            </label>
+            <div class="acc-list">
+                <template for:each={accountRows} for:item="a">
+                    <div key={a.accountId} class={a.cls} data-id={a.accountId} onclick={selectAccount}>
+                        <div class="acc-name">{a.name}</div>
+                        <div class="acc-meta"><span class="sr-faint">{a.country} · {a.segment}</span><span class={a.scopeTag}>{a.phase}</span></div>
+                        <div class="acc-meta"><span class="sr-muted">{a.openPointers} open pointers</span><span class="sr-strong">{a.valueText}</span></div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="main">
+            <template lwc:if={error}>
+                <div class="sr-alert sr-alert_error" role="alert">{error}</div>
+            </template>
+            <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+            <template lwc:if={hasData}>
+                <div class="sr-card">
+                    <div class="acc-title">{account.Name}</div>
+                    <div class="sr-muted">{account.BillingCity} {account.BillingCountry} · {profileLine} · Owner {account.Owner.Name}</div>
+                    <div class="sr-grid sr-grid_4 kpis">
+                        <template for:each={kpis} for:item="k">
+                            <div key={k.key}>
+                                <div class="sr-kpi-label">{k.label}</div>
+                                <div class="kpi-value">{k.value}</div>
+                                <div class="sr-kpi-hint">{k.hint}</div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="sr-card" data-tour="pointers">
+                    <div class="sr-card-title">Improvement pointers - 360° view</div>
+                    <div class="sr-grid sr-grid_2">
+                        <template for:each={quadrants} for:item="q">
+                            <div key={q.key} class="quadrant">
+                                <div class="q-head">
+                                    <span class="q-icon"><lightning-icon icon-name={q.icon} size="xx-small"></lightning-icon></span>
+                                    <span class="sr-strong">{q.label}</span>
+                                    <span class="q-total">{q.total}</span>
+                                </div>
+                                <template for:each={q.items} for:item="p">
+                                    <div key={p.id} class="q-item" data-id={p.id} onclick={openPointer}>
+                                        <span class={p.priorityClass}>{p.priority}</span>
+                                        <span class="q-text">{p.title}</span>
+                                        <span class={p.statusClass}>{p.status}</span>
+                                        <span class="sr-num sr-strong">{p.valueText}</span>
+                                    </div>
+                                </template>
+                                <template lwc:if={q.empty}><div class="sr-faint">No pointers in this category.</div></template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <template lwc:if={hasMarket}>
+                    <div class="sr-card" data-tour="market">
+                        <div class="sr-card-title">Market volume <span class="sr-card-sub">hip and knee procedures per month, national joint registry, as at {marketAsOf}</span></div>
+                        <div class="market-sites">
+                            <template for:each={marketSites} for:item="s">
+                                <span key={s.key} class="sr-tag">{s.name} · {s.hip} hips · {s.knee} knees / yr</span>
+                            </template>
+                        </div>
+                        <c-signal-room-line-chart months={market.months} series={market.series} unit="units" wide heading="Registry procedures per month"></c-signal-room-line-chart>
+                    </div>
+                </template>
+
+                <div class="sr-card" data-tour="contracts">
+                    <div class="sr-card-title">Contracts <span class="sr-card-sub">committed vs delivered to date</span></div>
+                    <template lwc:if={hasContracts}>
+                        <table class="sr-table">
+                            <tbody>
+                                <template for:each={contracts} for:item="c">
+                                    <tr key={c.contractId}>
+                                        <td><div class="sr-strong">{c.name}</div><div class="sr-faint">{c.term}</div></td>
+                                        <td><span class={c.healthClass}>{c.health}</span></td>
+                                        <td class="sr-num sr-strong">{c.complianceText}</td>
+                                        <td class="sr-muted">{c.lineText}</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                    <template lwc:else><div class="sr-faint">No volume contracts for this account.</div></template>
+                </div>
+
+                <div class="sr-card" data-tour="trend">
+                    <div class="sr-card-title">Revenue trend by category <span class="sr-card-sub">monthly</span></div>
+                    <c-signal-room-line-chart months={data.months} series={data.series} unit="money" wide heading="Monthly revenue by category"></c-signal-room-line-chart>
+                </div>
+
+                <div class="sr-grid sr-grid_2 row">
+                    <div class="sr-card" data-tour="lines">
+                        <div class="sr-card-title">Product lines <span class="sr-card-sub">growth = last 6 months vs the same months a year earlier</span></div>
+                        <table class="sr-table">
+                            <thead><tr><th>Line</th><th class="sr-num">Units 12m</th><th class="sr-num">Revenue 12m</th><th class="sr-num">Growth</th></tr></thead>
+                            <tbody>
+                                <template for:each={lines} for:item="l">
+                                    <tr key={l.key}>
+                                        <td>{l.line}<div class="sr-muted">{l.category}</div></td>
+                                        <td class="sr-num">{l.units}</td>
+                                        <td class="sr-num sr-strong">{l.last}</td>
+                                        <td class={l.growthCls}>{l.growthText}</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="sr-card" data-tour="surgeons">
+                        <div class="sr-card-title">Surgeons</div>
+                        <table class="sr-table">
+                            <thead><tr><th>Surgeon</th><th class="sr-num">Procedures / yr</th><th>Site</th><th>Contoso</th></tr></thead>
+                            <tbody>
+                                <template for:each={surgeons} for:item="s">
+                                    <tr key={s.key}>
+                                        <td>{s.name}<div class="sr-muted">{s.specialty} · since {s.since}</div></td>
+                                        <td class="sr-num">{s.procedures}</td>
+                                        <td>{s.role}<div class="sr-muted">{s.source}</div></td>
+                                        <td><span class={s.zbTag}>{s.zbText}</span></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="sr-grid sr-grid_2 row">
+                    <div class="sr-card" data-tour="tenders">
+                        <div class="sr-card-title">Tenders</div>
+                        <template lwc:if={hasTenders}>
+                            <table class="sr-table">
+                                <tbody>
+                                    <template for:each={tenders} for:item="t">
+                                        <tr key={t.Id}>
+                                            <td>
+                                                <template lwc:if={t.URL__c}><a href={t.URL__c} target="_blank" rel="noopener noreferrer" class="sr-link">{t.Name}</a></template>
+                                                <template lwc:else>{t.Name}</template>
+                                                <div class="sr-muted">{t.Reference__c} · {t.Source__c}</div>
+                                            </td>
+                                            <td class="nowrap">{t.deadline}<div class="sr-overdue">{t.left}</div></td>
+                                            <td class="sr-num">{t.value}</td>
+                                            <td>{t.Status__c}</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                        <template lwc:else><div class="sr-muted">No tenders.</div></template>
+                    </div>
+                    <div class="sr-card" data-tour="opps">
+                        <div class="sr-card-title">Open opportunities</div>
+                        <template lwc:if={hasOpps}>
+                            <table class="sr-table">
+                                <tbody>
+                                    <template for:each={opportunities} for:item="o">
+                                        <tr key={o.Id}>
+                                            <td>{o.Name}<div class="sr-muted">{o.Owner.Name}</div></td>
+                                            <td>{o.StageName}</td>
+                                            <td class="sr-num">{o.amount}</td>
+                                            <td class="nowrap">{o.close}</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                        <template lwc:else><div class="sr-muted">No open opportunities.</div></template>
+                    </div>
+                </div>
+            </template>
+            <template lwc:else>
+                <div class="sr-card sr-empty">Select an account to see its 360° view.</div>
+            </template>
+        </div>
+    </div>
+</template>
