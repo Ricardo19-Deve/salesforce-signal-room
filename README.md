@@ -2,6 +2,8 @@
 
 A **signal room** for field sales, built natively on Salesforce with Apex and Lightning Web Components. A rules engine reads monthly sell-in and finds **customer-level opportunities** ("pointers"). Reps review them with the numbers behind each one and an optional AI summary, then accept, reject or turn them into Opportunities. A **weekly signal room** asks the same 7 questions every 7 days, so the opportunities turn into committed actions. **Contracts** track committed volumes against what was delivered, a **market** view shows hospital procedure volumes from a public registry, and a **tender radar** reads real public tenders from the official EU and UK procurement APIs. A built-in **guide** explains every page, where its data comes from and how each number is calculated, and an interactive **tour** on every page highlights each block and explains it, for demos and onboarding.
 
+> **About the idea.** The concept is not mine: finding opportunities in sales data, putting them in front of the field team and reviewing them in a fixed weekly rhythm is an established sales-excellence practice. This project is my own implementation of it, designed and built my way, entirely inside Salesforce.
+
 This is a neutral open-source reference with fictitious data. The demo domain is orthopaedic implants (knees, hips, surgical robots) sold to hospitals, but the engine, the data model and the portal are generic. The only real data is optional and public: the UK National Joint Registry procedure volumes, which you download yourself, and public tender notices, which the org reads from the official APIs. Neither is included in the repository.
 
 | Module | What it shows |
