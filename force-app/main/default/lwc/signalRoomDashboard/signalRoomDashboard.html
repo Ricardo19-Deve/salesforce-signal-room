@@ -1,0 +1,114 @@
+<template>
+    <template lwc:if={error}>
+        <div class="sr-alert sr-alert_error" role="alert">{error}</div>
+    </template>
+    <div class="wrap">
+        <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+
+        <div class="sr-grid sr-grid_5">
+            <template for:each={kpis} for:item="k">
+                <div key={k.key} class="sr-card sr-kpi">
+                    <div class="sr-kpi-label">{k.label}</div>
+                    <div class="sr-kpi-value">{k.value}</div>
+                    <div class={k.hintClass}>{k.hint}</div>
+                </div>
+            </template>
+        </div>
+
+        <div class="block-head">
+            <span class="sr-section-label">Opportunity pointers by category</span>
+        </div>
+        <div class="sr-grid sr-grid_4">
+            <template for:each={quadrants} for:item="q">
+                <div key={q.key} class="sr-card quadrant">
+                    <div class="q-head">
+                        <span class="q-icon"><lightning-icon icon-name={q.icon} size="x-small"></lightning-icon></span>
+                        <div>
+                            <div class="q-title">{q.label}</div>
+                            <div class="sr-faint q-hint">{q.hint}</div>
+                        </div>
+                    </div>
+                    <div class="q-foot">
+                        <span class="sr-kpi-value">{q.value}</span>
+                        <span class="sr-tag">{q.count} open</span>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <div class="sr-grid sr-grid_2 row">
+            <div class="sr-card">
+                <div class="sr-card-title">Open value by country</div>
+                <template for:each={countryBars} for:item="b">
+                    <div key={b.key} class="sr-bar-row">
+                        <span class="bar-label">{b.label}<span class="sr-faint"> · {b.count}</span></span>
+                        <div class="sr-bar-track"><div class="sr-bar" style={b.style}></div></div>
+                        <span class="sr-num sr-strong">{b.value}</span>
+                    </div>
+                </template>
+            </div>
+            <div class="sr-card">
+                <div class="sr-card-title">Open value by pointer type</div>
+                <template for:each={typeBars} for:item="b">
+                    <div key={b.key} class="sr-bar-row">
+                        <span class="bar-label">{b.label}<span class="sr-faint"> · {b.count}</span></span>
+                        <div class="sr-bar-track"><div class="sr-bar" style={b.style}></div></div>
+                        <span class="sr-num sr-strong">{b.value}</span>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="sr-card row" data-tour="top">
+            <div class="sr-card-title">Top 10 pointers <span class="sr-card-sub">open, ranked by priority score</span></div>
+            <template lwc:if={hasTop}>
+                <div class="scroll">
+                    <table class="sr-table">
+                        <thead>
+                            <tr>
+                                <th>Priority</th><th>Pointer</th><th>Account</th><th>Type</th><th class="sr-num">Value / yr</th><th>Score</th><th>Status</th><th>Owner</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={top} for:item="p">
+                                <tr key={p.id} class="sr-click" data-id={p.id} onclick={openPointer}>
+                                    <td><span class={p.priorityClass}>{p.priority}</span></td>
+                                    <td class="sr-strong title-cell">{p.title}</td>
+                                    <td><span class="sr-link" data-id={p.accountId} onclick={openAccount}>{p.accountName}</span><div class="sr-faint">{p.country}</div></td>
+                                    <td class="sr-muted">{p.type}</td>
+                                    <td class="sr-num sr-strong">{p.valueText}</td>
+                                    <td class="nowrap"><span class="sr-score"><span class="sr-score-fill" style={p.scoreStyle}></span></span><span class="sr-muted">{p.score}</span></td>
+                                    <td><span class={p.statusClass}>{p.status}</span></td>
+                                    <td class="sr-muted">{p.assignedTo}</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+            <template lwc:else><div class="sr-empty">No open pointers for this filter.</div></template>
+        </div>
+
+        <div class="sr-card row" data-tour="rules">
+            <div class="sr-card-title">Rule performance <span class="sr-card-sub">rep feedback loop - acceptance below 40% means the rule needs tuning</span></div>
+            <div class="scroll">
+                <table class="sr-table">
+                    <thead>
+                        <tr><th>Rule</th><th class="sr-num">Pointers</th><th class="sr-num">Accepted</th><th class="sr-num">Rejected</th><th class="sr-num">Acceptance</th></tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={rulePerformance} for:item="r">
+                            <tr key={r.key}>
+                                <td>{r.label}</td>
+                                <td class="sr-num">{r.total}</td>
+                                <td class="sr-num">{r.accepted}</td>
+                                <td class="sr-num">{r.rejected}</td>
+                                <td class={r.rateClass}>{r.rate}</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</template>

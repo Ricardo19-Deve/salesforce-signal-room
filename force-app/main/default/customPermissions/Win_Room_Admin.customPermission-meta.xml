@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>Manage Win Room rules, run the engine and generate/purge demo data.</description>
-    <isLicensed>false</isLicensed>
-    <label>Win Room Admin</label>
-</CustomPermission>

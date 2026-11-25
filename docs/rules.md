@@ -1,6 +1,6 @@
 # Rules and configuration
 
-Rules are `WR_Rule__c` records, edited in **Rules & Data → Rules**. **Reset to defaults** restores the values below. After a change, **Run engine now**.
+Rules are `SR_Rule__c` records, edited in **Rules & Data → Rules**. **Reset to defaults** restores the values below. After a change, **Run engine now**.
 
 ## Fields
 
@@ -54,20 +54,20 @@ Rules are `WR_Rule__c` records, edited in **Rules & Data → Rules**. **Reset to
 
 ## Product lines
 
-`WR_Product_Line__c` maps materials to a system and component. The codes are referenced by the rules and by the demo generator: `KNEE_FEM`, `KNEE_TIB`, `KNEE_PAT`, `KNEE_CL`, `BONE_CEMENT`, `PARTIAL_KNEE`, `HIP_CUP`, `HIP_LINER`, `HIP_STEM_T`, `HIP_STEM_C`, `HIP_HEAD`, `ROBOT_KNEE`, `ROBOT_HIP`. The demo product names (Meridian, Unity, Orbit, Summit, Vista, Atlas) are fictitious. Capital lines (robots) are skipped by the churn and peer rules.
+`SR_Product_Line__c` maps materials to a system and component. The codes are referenced by the rules and by the demo generator: `KNEE_FEM`, `KNEE_TIB`, `KNEE_PAT`, `KNEE_CL`, `BONE_CEMENT`, `PARTIAL_KNEE`, `HIP_CUP`, `HIP_LINER`, `HIP_STEM_T`, `HIP_STEM_C`, `HIP_HEAD`, `ROBOT_KNEE`, `ROBOT_HIP`. The demo product names (Meridian, Unity, Orbit, Summit, Vista, Atlas) are fictitious. Capital lines (robots) are skipped by the churn and peer rules.
 
 ## Contracts
 
-`WR_Contract__c` (account, start / end, status, tolerance %, default 10%) with `WR_Contract_Line__c` (product line, committed units per month, contracted unit price). Create and edit them in the **Contracts** view (admins). The comparison starts at the later of the contract start and the first month with sales data, so a contract older than the loaded history is not reported as under-delivered.
+`SR_Contract__c` (account, start / end, status, tolerance %, default 10%) with `SR_Contract_Line__c` (product line, committed units per month, contracted unit price). Create and edit them in the **Contracts** view (admins). The comparison starts at the later of the contract start and the first month with sales data, so a contract older than the loaded history is not reported as under-delivered.
 
 ## Market volumes (public registry)
 
-`WR_Market_Site__c` holds one record per registry hospital: provider type, trust / company, region, hips and knees for the last 12 and prior 12 complete months, the monthly series and the linked account. The UK source is the public CSV export of the National Joint Registry (NJR StatsOnline, © NJR). Import it in **Market → Import NJR CSV**; the browser parses the file and only aggregates are stored. Matching links a hospital to an account when the hospital or trust name matches exactly (after removing words such as *hospital*, *NHS*, *trust*), and suggests a link when a distinctive word is shared. Linked accounts get `Volume_Source__c = NJR` and the registry volumes in their profile.
+`SR_Market_Site__c` holds one record per registry hospital: provider type, trust / company, region, hips and knees for the last 12 and prior 12 complete months, the monthly series and the linked account. The UK source is the public CSV export of the National Joint Registry (NJR StatsOnline, © NJR). Import it in **Market → Import NJR CSV**; the browser parses the file and only aggregates are stored. Matching links a hospital to an account when the hospital or trust name matches exactly (after removing words such as *hospital*, *NHS*, *trust*), and suggests a link when a distinctive word is shared. Linked accounts get `Volume_Source__c = NJR` and the registry volumes in their profile.
 
 ## Loading real data
 
 1. Map each ERP material to a product line code.
-2. Load monthly sell-in into `WR_Sales__c` (account, product line, period = first day of the month, units, revenue, an external key for upserts). Use 24 months for full year-over-year comparisons.
-3. Create one `WR_Account_Profile__c` per account with segment, size and procedures, and set the rollout phase and in-scope flag.
-4. Optionally load surgeon affiliations. Tenders can come from the public sync (**Tenders → Sync now**) or be loaded into `WR_Tender__c`.
-5. Run the engine (or schedule `WinRoomBenchmarkBatch.launch()`).
+2. Load monthly sell-in into `SR_Sales__c` (account, product line, period = first day of the month, units, revenue, an external key for upserts). Use 24 months for full year-over-year comparisons.
+3. Create one `SR_Account_Profile__c` per account with segment, size and procedures, and set the rollout phase and in-scope flag.
+4. Optionally load surgeon affiliations. Tenders can come from the public sync (**Tenders → Sync now**) or be loaded into `SR_Tender__c`.
+5. Run the engine (or schedule `SignalRoomBenchmarkBatch.launch()`).

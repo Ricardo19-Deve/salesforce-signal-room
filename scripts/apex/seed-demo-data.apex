@@ -1,4 +1,4 @@
-// Demo data for the Win Room (fictitious hospitals, surgeons, tenders and sales history).
+// Demo data for the Signal Room (fictitious hospitals, surgeons, tenders and sales history).
 // In a Developer Edition org (5 MB of data) the generator switches to compact mode: 18 months, ~2,000 sales rows.
 // Run as an admin:  sf apex run -o <org> -f scripts/apex/seed-demo-data.apex
 // Safe to re-run. Remove everything with Rules & Data > Purge demo data.
@@ -29,6 +29,6 @@ for (String country : hospitals.keySet()) {
 }
 insert accounts;
 
-// 2. Rules, product lines, profiles, surgeons, tenders, win rooms; sales in a batch that then runs the engine.
-Id jobId = WinRoomMockData.generate(true, true);
+// 2. Rules, product lines, profiles, surgeons, tenders, signal rooms; sales in a batch that then runs the engine.
+Id jobId = SignalRoomMockData.generate(true, true);
 System.debug(LoggingLevel.ERROR, 'Demo data job ' + jobId + ' started; pointers appear when the engine run completes.');

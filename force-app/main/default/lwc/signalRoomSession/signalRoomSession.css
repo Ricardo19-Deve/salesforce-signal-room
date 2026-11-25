@@ -1,0 +1,32 @@
+@import "c/signalRoomStyles";
+:host { display: block; }
+.layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+}
+.side { position: sticky; top: 72px; padding: 0.9rem; }
+.new-session { display: flex; align-items: flex-end; gap: 0.4rem; margin-top: 0.6rem; }
+.new-session .sr-field { flex: 1; }
+.sess-list { margin-top: 0.7rem; max-height: 55vh; overflow-y: auto; }
+.sess { padding: 0.55rem 0.65rem; border-radius: 8px; cursor: pointer; border: 1px solid transparent; display: flex; flex-direction: column; gap: 0.15rem; }
+.sess:hover { background: var(--sr-hover); }
+.sess_active { background: #eef2f7; border-color: var(--sr-line-strong); }
+.rules { margin-top: 0.8rem; }
+.main { position: relative; min-height: 200px; }
+.main .sr-card + .sr-card { margin-top: 1rem; }
+.session-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+.session-title { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.015em; }
+.session-actions { display: flex; gap: 0.5rem; }
+.kpis { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--sr-line); }
+.kpi-value { font-size: 1.3rem; font-weight: 700; }
+.index { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--sr-ink-2); }
+.index-item { display: inline-flex; align-items: center; gap: 0.3rem; }
+.brief { border-left: 3px solid var(--sr-navy); }
+.bullets { margin: 0.25rem 0 0.5rem 1.1rem; list-style: disc; font-size: 0.82rem; }
+.cmt-form { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; margin-top: 0.8rem; }
+.grow { flex: 1; min-width: 200px; }
+.owner { position: relative; min-width: 200px; }
+.owner-results { position: absolute; z-index: 10; background: #fff; border: 1px solid var(--sr-line); border-radius: 6px; width: 100%; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1); }
+.owner-item { padding: 0.4rem 0.6rem; cursor: pointer; font-size: 0.8rem; }
+.owner-item:hover { background: var(--sr-hover); }
+.nowrap { white-space: nowrap; }

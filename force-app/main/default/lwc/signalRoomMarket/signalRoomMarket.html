@@ -1,0 +1,114 @@
+<template>
+    <template lwc:if={error}>
+        <div class="sr-alert sr-alert_error" role="alert">{error}</div>
+    </template>
+    <template lwc:if={message}>
+        <div class="sr-alert sr-alert_info msg" role="status">
+            <span class="grow">{message}</span>
+            <button type="button" class="sr-icon-btn" title="Dismiss" aria-label="Dismiss" onclick={dismiss}><lightning-icon icon-name="utility:close" size="x-small"></lightning-icon></button>
+        </div>
+    </template>
+
+    <div class="sr-grid sr-grid_4">
+        <template for:each={kpis} for:item="k">
+            <div key={k.key} class="sr-card sr-kpi">
+                <div class="sr-kpi-label">{k.label}</div>
+                <div class="sr-kpi-value">{k.value}</div>
+                <div class="sr-kpi-hint">{k.hint}</div>
+            </div>
+        </template>
+    </div>
+
+    <div class="sr-card section">
+        <div class="sr-toolbar">
+            <label class="sr-search">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                <input type="search" placeholder="Search hospital, trust or account" oninput={handleSearch} />
+            </label>
+            <c-signal-room-select label="Region" value={region} options={regionOptions} data-field="region" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Sector" value={provider} options={providerOptions} data-field="provider" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Mapping" value={status} options={statusOptions} data-field="status" onchange={handleFilter}></c-signal-room-select>
+            <span class="spacer"></span>
+            <template lwc:if={isAdmin}>
+                <button type="button" class="sr-btn" onclick={rematch} disabled={busy}><lightning-icon icon-name="utility:link" size="xx-small" class="sr-btn-icon"></lightning-icon>Auto-match</button>
+                <button type="button" class="sr-btn sr-btn_primary" onclick={pickFiles} disabled={busy}><lightning-icon icon-name="utility:upload" size="xx-small" class="sr-btn-icon"></lightning-icon>Import NJR CSV</button>
+                <input class="file" type="file" accept=".csv,text/csv" multiple onchange={handleFiles} />
+            </template>
+        </div>
+
+        <div class="list">
+            <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+            <template lwc:if={hasRows}>
+                <table class="sr-table">
+                    <thead>
+                        <tr>
+                            <th>Hospital</th><th>Region</th><th>Sector</th><th class="sr-num">Hips / yr</th><th class="sr-num">Knees / yr</th>
+                            <th class="sr-num">YoY</th><th class="sr-num">Market value</th><th>Account</th><th class="sr-num">Our revenue 12m</th><th class="sr-num">Share of wallet</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={rows} for:item="r">
+                            <tr key={r.id}>
+                                <td><div class="sr-strong">{r.name}</div><div class="sr-faint">{r.orgName}</div></td>
+                                <td class="sr-muted">{r.region}</td>
+                                <td class="sr-muted">{r.providerShort}</td>
+                                <td class="sr-num sr-strong">{r.hipText}</td>
+                                <td class="sr-num sr-strong">{r.kneeText}</td>
+                                <td class={r.yoyClass}>{r.yoyText}</td>
+                                <td class="sr-num">{r.valueText}</td>
+                                <td class="account-cell">
+                                    <template lwc:if={r.isMapping}>
+                                        <div class="picker">
+                                            <input class="sr-input" type="text" placeholder="Search account" oninput={searchAccount} />
+                                            <template lwc:if={hasResults}>
+                                                <div class="results">
+                                                    <template for:each={accountResults} for:item="a">
+                                                        <div key={a.id} class="result" data-id={a.id} onclick={pickAccount}>{a.name}<span class="sr-faint"> {a.city} {a.country}</span></div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <button type="button" class="sr-icon-btn" title="Cancel" aria-label="Cancel" onclick={cancelMap}><lightning-icon icon-name="utility:close" size="x-small"></lightning-icon></button>
+                                        </div>
+                                    </template>
+                                    <template lwc:else>
+                                        <template lwc:if={r.isMapped}>
+                                            <div class="acc"><span class="sr-strong">{r.accountName}</span><span class={r.statusTag}>{r.status}</span></div>
+                                            <template lwc:if={isAdmin}>
+                                                <span class="sr-link small" data-id={r.id} onclick={unmap}>Unlink</span>
+                                            </template>
+                                        </template>
+                                        <template lwc:if={r.isSuggested}>
+                                            <div class="acc"><span class="sr-muted">{r.suggestedName}?</span><span class="sr-tag">{r.score}%</span></div>
+                                            <template lwc:if={isAdmin}>
+                                                <span class="actions">
+                                                    <span class="sr-link small" data-id={r.id} onclick={confirmMatch}>Confirm</span>
+                                                    <span class="sr-link small" data-id={r.id} onclick={startMap}>Other</span>
+                                                    <span class="sr-link small muted" data-id={r.id} onclick={ignore}>Ignore</span>
+                                                </span>
+                                            </template>
+                                        </template>
+                                        <template lwc:if={r.isOpen}>
+                                            <span class="sr-faint">{r.status}</span>
+                                            <template lwc:if={isAdmin}>
+                                                <span class="sr-link small" data-id={r.id} onclick={startMap}> Link account</span>
+                                            </template>
+                                        </template>
+                                    </template>
+                                </td>
+                                <td class="sr-num">{r.revenueText}</td>
+                                <td class="sr-num sr-strong">{r.sowText}</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+            <template lwc:else>
+                <div class="sr-empty">
+                    No registry data yet.
+                    <template lwc:if={isAdmin}> Download the CSV files from NJR StatsOnline ("Download all NJR statistics", NHS and Independent Sector) and use Import NJR CSV.</template>
+                </div>
+            </template>
+        </div>
+        <div class="sr-faint source">{sourceNote}</div>
+    </div>
+</template>

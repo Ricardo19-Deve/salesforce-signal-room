@@ -1,0 +1,51 @@
+@import "c/signalRoomStyles";
+:host { display: block; }
+.push { margin-left: auto; display: flex; gap: 0.5rem; }
+.msg { margin-bottom: 0.8rem; position: relative; }
+.msg-close { position: absolute; right: 0.6rem; }
+.msg-text { white-space: pre-wrap; max-width: 420px; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 9000; }
+.modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(820px, calc(100vw - 2rem));
+    max-height: calc(100vh - 3rem);
+    display: flex;
+    flex-direction: column;
+    background: var(--sr-card);
+    border-radius: 14px;
+    box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+    z-index: 9001;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.2rem 1.4rem 0.8rem; border-bottom: 1px solid var(--sr-line); }
+.modal-head h2 { margin: 0.2rem 0 0; font-size: 1.15rem; font-weight: 600; }
+.modal-body { padding: 1rem 1.4rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem; }
+.modal-foot { display: flex; align-items: center; gap: 0.6rem; padding: 0.85rem 1.4rem; border-top: 1px solid var(--sr-line); background: var(--sr-bg); border-radius: 0 0 14px 14px; }
+.spacer { flex: 1; }
+.group { margin-top: 0.4rem; }
+.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8125rem; padding: 0.5rem 0; color: var(--sr-ink-2); }
+.type-help { display: flex; gap: 0.5rem; align-items: flex-start; background: var(--sr-accent-soft); border-radius: 8px; padding: 0.6rem 0.8rem; color: var(--sr-ink-2); line-height: 1.45; }
+.lines-field { gap: 0.4rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chip {
+    border: 1px solid var(--sr-line-strong);
+    background: var(--sr-card);
+    border-radius: 14px;
+    padding: 0.2rem 0.65rem;
+    font: inherit;
+    font-size: 0.75rem;
+    color: var(--sr-ink-2);
+    cursor: pointer;
+}
+.chip:hover { background: var(--sr-hover); }
+.chip_on { background: var(--sr-accent-soft); border-color: var(--sr-accent); color: var(--sr-accent); font-weight: 600; }
+.custom-tag { margin-left: 0.4rem; }
+.help { margin-bottom: 0.6rem; }
+.form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.7rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1rem; }
+.section { margin-top: 1rem; }
+.phase { min-width: 140px; }
+.gen-options { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.8rem 0 0.9rem; }
+.gen-actions { margin-top: 0.8rem; }

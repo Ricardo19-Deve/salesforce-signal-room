@@ -1,0 +1,232 @@
+<template>
+    <div class="layout">
+        <div class="sr-card side">
+            <c-signal-room-select variant="field" label="Team" value={team} options={teamOptions} onchange={handleTeam}></c-signal-room-select>
+            <div class="new-session">
+                <label class="sr-field"><span class="sr-field-label">New signal room</span><input class="sr-input" type="date" value={newDate} onchange={handleNewDate} /></label>
+                <button type="button" class="sr-icon-btn" title="Create session" aria-label="Create session" onclick={newSession}><lightning-icon icon-name="utility:add" size="x-small"></lightning-icon></button>
+            </div>
+            <div class="sess-list">
+                <template for:each={sessionRows} for:item="s">
+                    <div key={s.id} class={s.cls} data-id={s.id} onclick={selectSession}>
+                        <div class="sr-strong">{s.dateText}</div>
+                        <div class="sr-muted"><span class={s.statusCls}>{s.status}</span> · {s.commitments} commitments</div>
+                    </div>
+                </template>
+            </div>
+            <div class="sr-muted rules">Same 7 questions every 7 days. Plug the cadence into the existing weekly sales meeting.</div>
+        </div>
+
+        <div class="main">
+            <template lwc:if={error}>
+                <div class="sr-alert sr-alert_error" role="alert">{error}</div>
+            </template>
+            <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+            <template lwc:if={hasAgenda}>
+                <div class="sr-card">
+                    <div class="session-head">
+                        <div>
+                            <div class="session-title">{session.Name}</div>
+                            <div class="sr-muted">Facilitator {session.Facilitator__r.Name} · changes since {sinceText}</div>
+                        </div>
+                        <div class="session-actions">
+                            <button type="button" class="sr-btn" onclick={generateBrief} disabled={busy}><lightning-icon icon-name="utility:einstein" size="xx-small" class="sr-btn-icon"></lightning-icon>AI briefing</button>
+                            <template lwc:if={isPlanned}>
+                                <button type="button" class="sr-btn sr-btn_primary" onclick={complete}>Complete signal room</button>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="sr-grid sr-grid_4 kpis">
+                        <template for:each={kpis} for:item="k">
+                            <div key={k.key}>
+                                <div class="sr-kpi-label">{k.label}</div>
+                                <div class="kpi-value">{k.value}</div>
+                                <div class="sr-kpi-hint">{k.hint}</div>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="index">
+                        <template for:each={questions} for:item="q">
+                            <span key={q.n} class="index-item"><span class="sr-q-num">{q.n}</span>{q.count}</span>
+                        </template>
+                    </div>
+                </div>
+
+                <template lwc:if={brief}>
+                    <div class="sr-card brief">
+                        <div class="sr-card-title"><lightning-icon icon-name="utility:einstein" size="x-small"></lightning-icon>{brief.headline}</div>
+                        <div class="sr-grid sr-grid_2">
+                            <template for:each={briefLists} for:item="l">
+                                <div key={l.key}>
+                                    <div class="sr-kpi-label">{l.label}</div>
+                                    <ul class="bullets"><template for:each={l.items} for:item="i"><li key={i.key}>{i.text}</li></template></ul>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="sr-muted">{briefNote}</div>
+                    </div>
+                </template>
+
+                <!-- Q1 -->
+                <div class="sr-card" data-tour="q1">
+                    <div class="sr-section-q"><span class="sr-q-num">1</span><span class="sr-card-title">What did we win or lose since the last signal room?</span></div>
+                    <table class="sr-table">
+                        <tbody>
+                            <template for:each={q1} for:item="p">
+                                <tr key={p.id} class="sr-click" data-id={p.id} onclick={openPointer}>
+                                    <td>{p.opportunityName}<div class="sr-muted">{p.title}</div></td>
+                                    <td><span class="sr-link" data-id={p.accountId} onclick={openAccount}>{p.accountName}</span></td>
+                                    <td>{p.opportunityStage}</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <template lwc:if={noQ1}><div class="sr-muted">No closed opportunities from pointers in this period.</div></template>
+                </div>
+
+                <!-- Q2 -->
+                <div class="sr-card" data-tour="q2">
+                    <div class="sr-section-q"><span class="sr-q-num">2</span><span class="sr-card-title">Which new pointers landed - who owns them?</span></div>
+                    <table class="sr-table">
+                        <tbody>
+                            <template for:each={q2} for:item="p">
+                                <tr key={p.id} class="sr-click" data-id={p.id} onclick={openPointer}>
+                                    <td><span class={p.priorityClass}>{p.priority}</span></td>
+                                    <td class="sr-strong">{p.title}<div class="sr-muted">{p.type}</div></td>
+                                    <td><span class="sr-link" data-id={p.accountId} onclick={openAccount}>{p.accountName}</span></td>
+                                    <td class="sr-num sr-strong">{p.valueText}</td>
+                                    <td class="sr-muted">{p.assignedTo}</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <template lwc:if={noQ2}><div class="sr-muted">Nothing to review.</div></template>
+                </div>
+
+                <!-- Q3 -->
+                <div class="sr-card" data-tour="q3">
+                    <div class="sr-section-q"><span class="sr-q-num">3</span><span class="sr-card-title">Which accepted pointers have no opportunity or action yet?</span></div>
+                    <table class="sr-table">
+                        <tbody>
+                            <template for:each={q3} for:item="p">
+                                <tr key={p.id} class="sr-click" data-id={p.id} onclick={openPointer}>
+                                    <td class="sr-strong">{p.title}<div class="sr-muted">{p.type}</div></td>
+                                    <td><span class="sr-link" data-id={p.accountId} onclick={openAccount}>{p.accountName}</span></td>
+                                    <td class="sr-num sr-strong">{p.valueText}</td>
+                                    <td class="sr-muted">{p.assignedTo}</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <template lwc:if={noQ3}><div class="sr-muted">Nothing to review.</div></template>
+                </div>
+
+                <!-- Q4 -->
+                <div class="sr-card" data-tour="q4">
+                    <div class="sr-section-q"><span class="sr-q-num">4</span><span class="sr-card-title">Which commitments are overdue or blocked?</span></div>
+                    <table class="sr-table">
+                        <tbody>
+                            <template for:each={q4} for:item="c">
+                                <tr key={c.Id}>
+                                    <td>{c.Action__c}<div class="sr-muted">{c.accountName} {c.pointerTitle}</div></td>
+                                    <td class="sr-muted">{c.ownerName}</td>
+                                    <td class={c.dueCls}>{c.due}</td>
+                                    <td><span class={c.cls}>{c.Status__c}</span></td>
+                                    <td class="sr-num">
+                                        <button type="button" class="sr-icon-btn" title="Done" aria-label="Done" data-id={c.Id} data-status="Done" onclick={setCommitment}><lightning-icon icon-name="utility:check" size="x-small"></lightning-icon></button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <template lwc:if={noQ4}><div class="sr-muted">Nothing to review.</div></template>
+                </div>
+
+                <!-- Q5 -->
+                <div class="sr-card" data-tour="q5">
+                    <div class="sr-section-q"><span class="sr-q-num">5</span><span class="sr-card-title">Where are opportunities stuck (no stage change in 21 days)?</span></div>
+                    <table class="sr-table">
+                        <tbody>
+                            <template for:each={q5} for:item="p">
+                                <tr key={p.id} class="sr-click" data-id={p.id} onclick={openPointer}>
+                                    <td>{p.opportunityName}<div class="sr-muted">{p.title}</div></td>
+                                    <td><span class="sr-link" data-id={p.accountId} onclick={openAccount}>{p.accountName}</span></td>
+                                    <td>{p.opportunityStage}</td>
+                                    <td class="sr-muted">{p.assignedTo}</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <template lwc:if={noQ5}><div class="sr-muted">Nothing to review.</div></template>
+                </div>
+
+                <!-- Q6 -->
+                <div class="sr-card" data-tour="q6">
+                    <div class="sr-section-q"><span class="sr-q-num">6</span><span class="sr-card-title">Which tenders close in the next 30 days?</span></div>
+                    <table class="sr-table">
+                        <tbody>
+                            <template for:each={q6} for:item="t">
+                                <tr key={t.Id}>
+                                    <td>{t.Name}<div class="sr-muted">{t.Reference__c}</div></td>
+                                    <td><span class="sr-link" data-id={t.Account__c} onclick={openAccount}>{t.accountName}</span></td>
+                                    <td class="nowrap">{t.deadline}<div class="sr-overdue">{t.left}</div></td>
+                                    <td class="sr-num">{t.value}</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <template lwc:if={noQ6}><div class="sr-muted">Nothing to review.</div></template>
+                </div>
+
+                <!-- Q7 -->
+                <div class="sr-card" data-tour="q7">
+                    <div class="sr-section-q"><span class="sr-q-num">7</span><span class="sr-card-title">What do we commit to for next week?</span></div>
+                    <table class="sr-table">
+                        <tbody>
+                            <template for:each={q7} for:item="c">
+                                <tr key={c.Id}>
+                                    <td>{c.Action__c}<div class="sr-muted">{c.accountName} {c.pointerTitle}</div></td>
+                                    <td class="sr-muted">{c.ownerName}</td>
+                                    <td class={c.dueCls}>{c.due}</td>
+                                    <td><span class={c.cls}>{c.Status__c}</span></td>
+                                    <td class="sr-num nowrap">
+                                        <template lwc:if={c.isOpen}>
+                                            <button type="button" class="sr-icon-btn" title="Done" aria-label="Done" data-id={c.Id} data-status="Done" onclick={setCommitment}><lightning-icon icon-name="utility:check" size="x-small"></lightning-icon></button>
+                                            <button type="button" class="sr-icon-btn" title="Blocked" aria-label="Blocked" data-id={c.Id} data-status="Blocked" onclick={setCommitment}><lightning-icon icon-name="utility:ban" size="x-small"></lightning-icon></button>
+                                        </template>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <template lwc:if={noQ7}><div class="sr-muted">Nothing to review.</div></template>
+                    <div class="cmt-form">
+                        <label class="sr-field grow"><span class="sr-field-label">Action</span><input class="sr-input" type="text" value={cmtAction} data-field="cmtAction" oninput={handleCmt} /></label>
+                        <c-signal-room-select class="grow" variant="field" label="Linked pointer" value={cmtPointerId} options={pointerOptions} data-field="cmtPointerId" onchange={handleCmt}></c-signal-room-select>
+                        <div class="owner">
+                            <label class="sr-field"><span class="sr-field-label">Owner (default: me)</span><input class="sr-input" type="text" value={ownerLabel} oninput={handleOwnerSearch} /></label>
+                            <template lwc:if={hasOwnerResults}>
+                                <div class="owner-results">
+                                    <template for:each={ownerResults} for:item="u">
+                                        <div key={u.id} class="owner-item" data-id={u.id} data-name={u.name} onclick={pickOwner}>{u.name}<span class="sr-muted"> {u.title}</span></div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                        <label class="sr-field"><span class="sr-field-label">Due</span><input class="sr-input" type="date" value={cmtDue} data-field="cmtDue" onchange={handleCmt} /></label>
+                        <button type="button" class="sr-btn sr-btn_primary" onclick={addCommitment} disabled={busy}>Commit</button>
+                    </div>
+                </div>
+
+                <div class="sr-card" data-tour="notes">
+                    <div class="sr-card-title">Notes</div>
+                    <label class="sr-field"><textarea class="sr-input sr-textarea" value={notes} oninput={handleNotes}></textarea></label>
+                    <button type="button" class="sr-btn sr-mt-xs" onclick={saveNotes}>Save notes</button>
+                </div>
+            </template>
+            <template lwc:else>
+                <div class="sr-card sr-empty">Create or select a signal room session.</div>
+            </template>
+        </div>
+    </div>
+</template>

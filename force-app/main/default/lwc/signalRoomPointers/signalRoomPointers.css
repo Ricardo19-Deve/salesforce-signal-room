@@ -1,0 +1,7 @@
+@import "c/signalRoomStyles";
+:host { display: block; }
+.sr-search { flex: 1; max-width: 380px; }
+.spacer { flex: 1; }
+.summary { margin-bottom: 0.5rem; }
+.list { position: relative; min-height: 120px; overflow-x: auto; }
+.nowrap { white-space: nowrap; }

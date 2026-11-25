@@ -1,0 +1,55 @@
+<template>
+    <div class="sr-card">
+        <div class="sr-toolbar">
+            <label class="sr-search">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                <input type="search" placeholder="Search pointer, account or SR-number" oninput={handleSearch} />
+            </label>
+            <c-signal-room-select label="Status" value={status} options={statusOptions} data-field="status" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Category" value={category} options={categoryOptions} data-field="category" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Type" value={type} options={typeOptions} data-field="type" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Priority" value={priority} options={priorityOptions} data-field="priority" onchange={handleFilter}></c-signal-room-select>
+            <span class="spacer"></span>
+            <c-signal-room-select label="Sort" value={sortBy} options={sortOptions} data-field="sortBy" onchange={handleFilter}></c-signal-room-select>
+        </div>
+        <template lwc:if={error}>
+            <div class="sr-alert sr-alert_error" role="alert">{error}</div>
+        </template>
+        <div class="summary"><span class="sr-section-label">{summary}</span></div>
+        <div class="list">
+            <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+            <template lwc:if={hasRows}>
+                <table class="sr-table">
+                    <thead>
+                        <tr>
+                            <th>Priority</th><th>#</th><th>Pointer</th><th>Account</th><th>Type</th>
+                            <th class="sr-num">Value / yr</th><th>Score</th><th>Due</th><th>Status</th><th>Owner</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={rows} for:item="p">
+                            <tr key={p.id} class="sr-click" data-id={p.id} onclick={openPointer}>
+                                <td><span class={p.priorityClass}>{p.priority}</span></td>
+                                <td class="sr-faint nowrap">{p.name}</td>
+                                <td>
+                                    <div class="sr-strong">{p.title}</div>
+                                    <div class="sr-faint">{p.rule}</div>
+                                </td>
+                                <td><span class="sr-link" data-id={p.accountId} onclick={openAccount}>{p.accountName}</span><div class="sr-muted">{p.country}</div></td>
+                                <td class="sr-muted nowrap">{p.type}</td>
+                                <td class="sr-num sr-strong">{p.valueText}</td>
+                                <td class="nowrap"><span class="sr-score"><span class="sr-score-fill" style={p.scoreStyle}></span></span>{p.score}</td>
+                                <td class={p.dueCellClass}>{p.dueText}</td>
+                                <td class="nowrap"><span class={p.statusClass}>{p.status}</span><div class="sr-faint">{p.opportunityStage}</div></td>
+                                <td class="sr-muted nowrap">{p.assignedTo}</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+            <template lwc:else>
+                <div class="sr-empty">No pointers match these filters.</div>
+            </template>
+        </div>
+    </div>
+</template>

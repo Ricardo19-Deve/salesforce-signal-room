@@ -1,0 +1,182 @@
+<template>
+    <template lwc:if={error}>
+        <div class="sr-alert sr-alert_error" role="alert">{error}</div>
+    </template>
+    <template lwc:if={message}>
+        <div class="sr-alert sr-alert_info msg" role="status">
+            <span class="grow">{message}</span>
+            <button type="button" class="sr-icon-btn" title="Dismiss" aria-label="Dismiss" onclick={dismiss}><lightning-icon icon-name="utility:close" size="x-small"></lightning-icon></button>
+        </div>
+    </template>
+
+    <div class="sr-grid sr-grid_4">
+        <template for:each={kpis} for:item="k">
+            <div key={k.key} class="sr-card sr-kpi">
+                <div class="sr-kpi-label">{k.label}</div>
+                <div class="sr-kpi-value">{k.value}</div>
+                <div class="sr-kpi-hint">{k.hint}</div>
+            </div>
+        </template>
+    </div>
+
+    <template lwc:if={isAdmin}>
+        <div class="sr-card section" data-tour="feeds">
+            <div class="feeds-head">
+                <div>
+                    <div class="sr-card-title">Sources</div>
+                    <div class="sr-faint">Public procurement portals read by the sync. CPV prefixes decide which notices are in scope.</div>
+                </div>
+                <span class="spacer"></span>
+                <label class="sr-switch"><input type="checkbox" checked={scheduled} onchange={toggleSchedule} disabled={busy} /><span class="sr-switch-ui"></span><span>Daily sync at 06:00</span></label>
+                <button type="button" class="sr-btn sr-btn_primary" onclick={sync} disabled={syncDisabled}><lightning-icon icon-name="utility:refresh" size="xx-small" class="sr-btn-icon"></lightning-icon>{syncLabel}</button>
+            </div>
+            <table class="sr-table feeds">
+                <thead>
+                    <tr><th>Source</th><th>Active</th><th>CPV prefixes</th><th>Countries</th><th class="sr-num">Lookback (days)</th><th>Last run</th><th>Result</th><th></th></tr>
+                </thead>
+                <tbody>
+                    <template for:each={feeds} for:item="f">
+                        <tr key={f.Id}>
+                            <td><div class="sr-strong">{f.Name}</div><div class="sr-faint">{f.coverage}</div></td>
+                            <td><label class="sr-switch"><input type="checkbox" checked={f.Active__c} data-id={f.Id} data-field="Active__c" onchange={editFeed} /><span class="sr-switch-ui"></span></label></td>
+                            <td><input class="sr-input cpv" type="text" value={f.CPV_Prefixes__c} data-id={f.Id} data-field="CPV_Prefixes__c" oninput={editFeed} /></td>
+                            <td>
+                                <template lwc:if={f.isTed}><input class="sr-input countries" type="text" placeholder="All" value={f.countriesValue} data-id={f.Id} data-field="Countries__c" oninput={editFeed} /></template>
+                                <template lwc:else><span class="sr-muted">{f.fixedCountry}</span></template>
+                            </td>
+                            <td class="sr-num"><input class="sr-input days" type="number" min="1" max="365" value={f.Lookback_Days__c} data-id={f.Id} data-field="Lookback_Days__c" oninput={editFeed} /></td>
+                            <td class="sr-muted nowrap">{f.lastRun}</td>
+                            <td class={f.statusClass}>{f.Last_Status__c}</td>
+                            <td>
+                                <template lwc:if={f.dirty}><button type="button" class="sr-btn" data-id={f.Id} onclick={saveFeed}>Save</button></template>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </template>
+
+    <div class="sr-card section">
+        <div class="sr-toolbar">
+            <label class="sr-search">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                <input type="search" placeholder="Search title, buyer or account" oninput={handleSearch} />
+            </label>
+            <c-signal-room-select label="Status" value={status} options={statusOptions} data-field="status" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Source" value={source} options={sourceOptions} data-field="source" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Country" value={country} options={countryOptions} data-field="country" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Category" value={category} options={categoryOptions} data-field="category" onchange={handleFilter}></c-signal-room-select>
+            <c-signal-room-select label="Account" value={mapping} options={mappingOptions} data-field="mapping" onchange={handleFilter}></c-signal-room-select>
+            <template lwc:if={isAdmin}>
+                <span class="spacer"></span>
+                <button type="button" class="sr-btn" onclick={rematch} disabled={busy}><lightning-icon icon-name="utility:link" size="xx-small" class="sr-btn-icon"></lightning-icon>Auto-match</button>
+            </template>
+        </div>
+
+        <div class="list">
+            <template lwc:if={loading}><lightning-spinner alternative-text="Loading" size="small"></lightning-spinner></template>
+            <template lwc:if={hasRows}>
+                <table class="sr-table">
+                    <thead>
+                        <tr><th>Tender</th><th>Country</th><th>Category</th><th class="sr-num">Est. value</th><th>Deadline</th><th>Source</th><th>Account</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={rows} for:item="r">
+                            <tr key={r.id} class={r.rowClass}>
+                                <td class="title-cell">
+                                    <button type="button" class="expander" data-id={r.id} onclick={toggleRow} aria-expanded={r.expandedAttr} title="Details">
+                                        <lightning-icon icon-name={r.chevron} size="xx-small"></lightning-icon>
+                                    </button>
+                                    <div>
+                                        <template lwc:if={r.url}><a class="sr-link sr-strong title-text" href={r.url} target="_blank" rel="noopener noreferrer" title={r.title}>{r.title}</a></template>
+                                        <template lwc:else><span class="sr-strong title-text">{r.title}</span></template>
+                                        <div class="sr-faint">{r.buyer}</div>
+                                    </div>
+                                </td>
+                                <td class="sr-muted nowrap">{r.countryName}</td>
+                                <td><span class="sr-tag">{r.category}</span></td>
+                                <td class="sr-num"><div class="sr-strong">{r.valueText}</div><div class="sr-faint">{r.originalText}</div></td>
+                                <td class="nowrap"><div>{r.deadlineText}</div><div class={r.daysClass}>{r.daysText}</div></td>
+                                <td class="sr-muted nowrap">{r.source}</td>
+                                <td class="account-cell">
+                                    <template lwc:if={r.isMapping}>
+                                        <div class="picker">
+                                            <input class="sr-input" type="text" placeholder="Search account" oninput={searchAccount} />
+                                            <template lwc:if={hasResults}>
+                                                <div class="results">
+                                                    <template for:each={accountResults} for:item="a">
+                                                        <div key={a.id} class="result" data-id={a.id} onclick={pickAccount}>{a.name}<span class="sr-faint"> {a.city} {a.country}</span></div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <button type="button" class="sr-icon-btn" title="Cancel" aria-label="Cancel" onclick={cancelMap}><lightning-icon icon-name="utility:close" size="x-small"></lightning-icon></button>
+                                        </div>
+                                    </template>
+                                    <template lwc:else>
+                                        <template lwc:if={r.isMapped}>
+                                            <div class="acc"><span class="sr-link sr-strong" data-id={r.accountId} onclick={openAccount}>{r.accountName}</span><span class={r.statusTag}>{r.matchStatus}</span></div>
+                                            <template lwc:if={r.canUnlink}>
+                                                <span class="sr-link small" data-id={r.id} onclick={unmap}>Unlink</span>
+                                            </template>
+                                        </template>
+                                        <template lwc:if={r.isSuggested}>
+                                            <div class="acc"><span class="sr-muted">{r.suggestedName}?</span><span class="sr-tag">{r.score}%</span></div>
+                                            <template lwc:if={isAdmin}>
+                                                <span class="actions">
+                                                    <span class="sr-link small" data-id={r.id} onclick={confirmMatch}>Confirm</span>
+                                                    <span class="sr-link small" data-id={r.id} onclick={startMap}>Other</span>
+                                                    <span class="sr-link small muted" data-id={r.id} onclick={ignore}>Ignore</span>
+                                                </span>
+                                            </template>
+                                        </template>
+                                        <template lwc:if={r.isOpen}>
+                                            <span class="sr-faint">{r.matchStatus}</span>
+                                            <template lwc:if={isAdmin}>
+                                                <span class="sr-link small" data-id={r.id} onclick={startMap}> Link account</span>
+                                            </template>
+                                        </template>
+                                    </template>
+                                </td>
+                                <td><span class={r.statusClass}>{r.status}</span></td>
+                            </tr>
+                            <template lwc:if={r.expanded}>
+                                <tr key={r.detailKey} class="detail-row">
+                                    <td colspan="8">
+                                        <div class="detail">
+                                            <div class="detail-text">
+                                                <template lwc:if={r.description}><p>{r.description}</p></template>
+                                                <template lwc:else><p class="sr-faint">The notice has no description in the feed. Open the notice for the full documents.</p></template>
+                                            </div>
+                                            <dl class="detail-facts">
+                                                <dt>Reference</dt><dd>{r.reference}</dd>
+                                                <dt>Published</dt><dd>{r.publishedText}</dd>
+                                                <dt>CPV codes</dt><dd>{r.cpvText}</dd>
+                                                <dt>Value</dt><dd>{r.valueNote}</dd>
+                                            </dl>
+                                            <template lwc:if={isAdmin}>
+                                                <div class="detail-actions">
+                                                    <span class="sr-faint">Set status</span>
+                                                    <template for:each={r.statusActions} for:item="s">
+                                                        <button key={s.value} type="button" class={s.cls} data-id={r.id} data-status={s.value} onclick={setStatus}>{s.label}</button>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+            <template lwc:else>
+                <div class="sr-empty">
+                    No tenders for these filters.
+                    <template lwc:if={isAdmin}> Use Sync now to read the public portals.</template>
+                </div>
+            </template>
+        </div>
+        <div class="sr-faint source">{sourceNote}</div>
+    </div>
+</template>

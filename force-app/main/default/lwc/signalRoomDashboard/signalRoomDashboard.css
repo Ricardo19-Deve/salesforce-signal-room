@@ -1,0 +1,24 @@
+@import "c/signalRoomStyles";
+:host { display: block; }
+.wrap { position: relative; }
+.block-head { margin: 1.4rem 0 0.6rem; }
+.row { margin-top: 1rem; }
+.quadrant { display: flex; flex-direction: column; gap: 0.1rem; }
+.q-head { display: flex; align-items: flex-start; gap: 0.65rem; }
+.q-hint { margin-top: 0.1rem; line-height: 1.35; }
+.q-icon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #f1f3f6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.q-title { font-weight: 600; font-size: 0.875rem; }
+.q-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-top: auto; padding-top: 0.9rem; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scroll { overflow-x: auto; }
+.title-cell { max-width: 380px; }
+.nowrap { white-space: nowrap; }

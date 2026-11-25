@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Demo__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Created by the Signal Room mock data generator; removed by Purge.</description>
+    <label>Is Demo Data</label>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>
